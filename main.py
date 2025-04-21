@@ -9,6 +9,9 @@ from email.mime.multipart import MIMEMultipart
 from bs4 import BeautifulSoup
 import time
 import os
+import sys
+print(f"🛠 Running Python version: {sys.version}")
+
 
 # --- CONFIG ---
 EMAIL_SENDER = os.getenv("EMAIL_SENDER", "benjihornetrades@gmail.com")

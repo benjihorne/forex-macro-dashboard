@@ -1,4 +1,5 @@
 # === FULL MAIN.PY WITH UPGRADES ===
+print("⚙️ main.py has started execution")
 import requests
 import pandas as pd
 import datetime

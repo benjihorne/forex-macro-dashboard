@@ -27,7 +27,7 @@ TRADE_PAIRS = [
 ]
 RUN_INTERVAL_SECONDS = 60  # TEMP: scan every 60 seconds for testing
 
-# --- COT Data (Quandl) ---
+# --- COT Data ---
 def get_cot_data(currency):
     code_map = {
         "EUR": "CHRIS/CME_EC1",
@@ -51,7 +51,7 @@ def get_cot_data(currency):
     except:
         return {"net_spec_position": 0, "extreme_zscore": 0.0}
 
-# --- Yield Spread (FRED) ---
+# --- Yield Spread ---
 def get_yield_spread(ccy1, ccy2):
     fred_series = {
         ("USD", "EUR"): ("DGS2", "IRLTLT01EZM156N"),
@@ -75,7 +75,7 @@ def get_yield_spread(ccy1, ccy2):
     except:
         return {"spread": 0.0, "momentum": "neutral"}
 
-# --- Retail Sentiment (IG) ---
+# --- Retail Sentiment ---
 def get_retail_sentiment(pair):
     url = "https://www.ig.com/au/trading-strategies/client-sentiment"
     try:
@@ -96,7 +96,7 @@ def get_retail_sentiment(pair):
     except:
         return {"long_percent": 50, "retail_against": False}
 
-# --- Static Placeholders ---
+# --- Static Macros ---
 def get_central_bank_tone(currency):
     return {"tone": "hawkish", "recent_surprise": True}
 
@@ -110,15 +110,18 @@ def get_upcoming_catalyst(pair):
     return {"event": "FOMC meeting", "bias_alignment": True}
 
 # --- Email Alert ---
-def send_email_alert(pair, checklist):
+def send_email_alert(pair, checklist, direction):
+    confidence = len(checklist)
     msg = MIMEMultipart("alternative")
-    msg["Subject"] = f"Trade Signal: {pair}"
+    msg["Subject"] = f"Trade Signal: {direction.upper()} {pair} ({confidence}/7 Confidence)"
     msg["From"] = EMAIL_SENDER
     msg["To"] = EMAIL_RECEIVER
     html = f"""
     <html>
         <body>
             <h2>Trade Setup Triggered for {pair}</h2>
+            <p><strong>Direction:</strong> {direction.upper()}</p>
+            <p><strong>Confidence Score:</strong> {confidence}/7</p>
             <ul>{''.join(f'<li>{item}</li>' for item in checklist)}</ul>
         </body>
     </html>
@@ -147,17 +150,28 @@ def log_trade(pair, checklist):
 # --- Core Scanner ---
 def scan_trade_opportunity(pair, base_ccy, quote_ccy):
     checklist = []
+    base_strength = 0
+    quote_strength = 0
+
     if get_central_bank_tone(base_ccy)['tone'] == 'hawkish':
         checklist.append("Macro favors base currency")
+        base_strength += 1
+
     spread = get_yield_spread(base_ccy, quote_ccy)
     if spread['spread'] > 0 and spread['momentum'] == 'rising':
         checklist.append("Yield spread favors base + momentum")
+        base_strength += 1
+    elif spread['spread'] < 0 and spread['momentum'] == 'falling':
+        quote_strength += 1
+
     cot = get_cot_data(base_ccy)
     if abs(cot['extreme_zscore']) > 1.5:
         checklist.append("COT speculators at extreme")
+
     sentiment = get_retail_sentiment(pair)
     if sentiment['retail_against']:
         checklist.append("Retail is on wrong side")
+
     if get_intermarket_agreement(pair):
         checklist.append("Intermarket correlation confirmed")
     if get_technical_pattern(pair)['key_level_broken']:
@@ -170,9 +184,12 @@ def scan_trade_opportunity(pair, base_ccy, quote_ccy):
     print(f"Pair: {pair}\n")
     for item in checklist:
         print(f"✅ {item}")
+
+    direction = "long" if base_strength >= quote_strength else "short"
+
     if len(checklist) >= 3:
-        print("\n✅ TRADE VALIDATED (3+ confluences)")
-        send_email_alert(pair, checklist)
+        print(f"\n✅ TRADE VALIDATED (3+ confluences, {direction.upper()} {pair})")
+        send_email_alert(pair, checklist, direction)
         log_trade(pair, checklist)
     else:
         print("\n❌ Not enough edge for swing entry")

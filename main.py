@@ -187,7 +187,7 @@ def scan_trade_opportunity(pair, base_ccy, quote_ccy):
         print(f"✅ {item}")
     print(f"Total confluences: {len(checklist)}")
     direction = "long" if base_strength >= quote_strength else "short"
-    if len(checklist) >= 5:
+    if len(checklist) >= 2:
         print(f"✅ TRADE VALIDATED ({len(checklist)}/7, {direction.upper()} {pair})")
         send_email_alert(pair, checklist, direction)
         log_trade(pair, checklist)

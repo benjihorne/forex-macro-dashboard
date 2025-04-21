@@ -1,6 +1,3 @@
-# Forex Swing Trade Macro Sentiment Dashboard with Alerts and Logging
-# Author: Built for a disciplined, macro-aware trader
-
 import requests
 import pandas as pd
 import datetime
@@ -11,7 +8,7 @@ from bs4 import BeautifulSoup
 import time
 import os
 
-# --- CONFIGURATION ---
+# --- CONFIG ---
 EMAIL_SENDER = os.getenv("EMAIL_SENDER", "benjihornetrades@gmail.com")
 EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD", "Ben135790!")
 EMAIL_RECEIVER = os.getenv("EMAIL_RECEIVER", "benhorne6@gmail.com")
@@ -20,14 +17,10 @@ SMTP_PORT = 587
 LOG_FILE = "trade_log.csv"
 QUANDL_API_KEY = os.getenv("QUANDL_API_KEY", "jmA5k4Z8BwXLW_6hkw-2")
 FRED_API_KEY = os.getenv("FRED_API_KEY", "03041666822ce885ee3462500fa93cd5")
-TRADE_PAIRS = [
-    ("GBP/USD", "GBP", "USD"),
-    ("EUR/USD", "EUR", "USD"),
-    ("USD/JPY", "USD", "JPY")
-]
-RUN_INTERVAL_SECONDS = 60  # TEMP: scan every 60 seconds for testing
+TRADE_PAIRS = [("GBP/USD", "GBP", "USD"), ("EUR/USD", "EUR", "USD"), ("USD/JPY", "USD", "JPY")]
+RUN_INTERVAL_SECONDS = 60
 
-# --- COT Data ---
+# --- Data ---
 def get_cot_data(currency):
     code_map = {
         "EUR": "CHRIS/CME_EC1",
@@ -51,7 +44,6 @@ def get_cot_data(currency):
     except:
         return {"net_spec_position": 0, "extreme_zscore": 0.0}
 
-# --- Yield Spread ---
 def get_yield_spread(ccy1, ccy2):
     fred_series = {
         ("USD", "EUR"): ("DGS2", "IRLTLT01EZM156N"),
@@ -75,7 +67,6 @@ def get_yield_spread(ccy1, ccy2):
     except:
         return {"spread": 0.0, "momentum": "neutral"}
 
-# --- Retail Sentiment ---
 def get_retail_sentiment(pair):
     url = "https://www.ig.com/au/trading-strategies/client-sentiment"
     try:
@@ -96,7 +87,7 @@ def get_retail_sentiment(pair):
     except:
         return {"long_percent": 50, "retail_against": False}
 
-# --- Static Macros ---
+# --- Static logic ---
 def get_central_bank_tone(currency):
     return {"tone": "hawkish", "recent_surprise": True}
 
@@ -109,13 +100,18 @@ def get_technical_pattern(pair):
 def get_upcoming_catalyst(pair):
     return {"event": "FOMC meeting", "bias_alignment": True}
 
-# --- Email Alert ---
+# --- Email ---
 def send_email_alert(pair, checklist, direction):
     confidence = len(checklist)
+    if confidence < 5:
+        print(f"❌ Email BLOCKED — only {confidence}/7 confluences for {pair}")
+        return
+
     msg = MIMEMultipart("alternative")
     msg["Subject"] = f"Trade Signal: {direction.upper()} {pair} ({confidence}/7 Confidence)"
     msg["From"] = EMAIL_SENDER
     msg["To"] = EMAIL_RECEIVER
+
     html = f"""
     <html>
         <body>
@@ -132,7 +128,7 @@ def send_email_alert(pair, checklist, direction):
         server.login(EMAIL_SENDER, EMAIL_PASSWORD)
         server.sendmail(EMAIL_SENDER, EMAIL_RECEIVER, msg.as_string())
 
-# --- Logging ---
+# --- Log ---
 def log_trade(pair, checklist):
     df = pd.DataFrame([{
         "timestamp": datetime.datetime.utcnow(),
@@ -147,7 +143,7 @@ def log_trade(pair, checklist):
         pass
     df.to_csv(LOG_FILE, index=False)
 
-# --- Core Scanner ---
+# --- Scanner ---
 def scan_trade_opportunity(pair, base_ccy, quote_ccy):
     checklist = []
     base_strength = 0
@@ -180,30 +176,30 @@ def scan_trade_opportunity(pair, base_ccy, quote_ccy):
     if catalyst['bias_alignment']:
         checklist.append(f"Catalyst aligns: {catalyst['event']}")
 
-    print("================= DAILY SCAN =================")
-    print(f"Pair: {pair}\n")
+    print("========= SCAN =========")
+    print(f"Pair: {pair}")
     for item in checklist:
         print(f"✅ {item}")
+    print(f"Total confluences: {len(checklist)}")
 
     direction = "long" if base_strength >= quote_strength else "short"
 
-    if len(checklist) >= 3:
-        print(f"\n✅ TRADE VALIDATED (3+ confluences, {direction.upper()} {pair})")
+    if len(checklist) >= 5:
+        print(f"✅ TRADE VALIDATED ({len(checklist)}/7, {direction.upper()} {pair})")
         send_email_alert(pair, checklist, direction)
         log_trade(pair, checklist)
     else:
-        print("\n❌ Not enough edge for swing entry")
+        print("❌ Not enough edge for swing entry")
 
-# --- Auto Scheduler ---
+# --- Loop ---
 def auto_run_dashboard():
     while True:
         print("================= DAILY SCAN =================")
         for pair, base, quote in TRADE_PAIRS:
             scan_trade_opportunity(pair, base, quote)
-            print("---------------------------------------------")
-        print("Waiting until next scheduled run...")
+            print("------------------------------------------------")
         time.sleep(RUN_INTERVAL_SECONDS)
 
-# Run
+# --- Start ---
 if __name__ == "__main__":
     auto_run_dashboard()

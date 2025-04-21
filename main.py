@@ -199,6 +199,7 @@ def scan_trade_opportunity(pair, base_ccy, quote_ccy):
 # --- RUN LOOP ---
 def auto_run_dashboard():
     while True:
+        print(f"\n[SCAN START] {datetime.datetime.utcnow()} UTC")
         print("========== STARTING NEW SCAN ==========")
         for pair, base, quote in TRADE_PAIRS:
             scan_trade_opportunity(pair, base, quote)

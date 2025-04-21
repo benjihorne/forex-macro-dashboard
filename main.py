@@ -18,9 +18,9 @@ LOG_FILE = "trade_log.csv"
 QUANDL_API_KEY = os.getenv("QUANDL_API_KEY", "jmA5k4Z8BwXLW_6hkw-2")
 FRED_API_KEY = os.getenv("FRED_API_KEY", "03041666822ce885ee3462500fa93cd5")
 TRADE_PAIRS = [("GBP/USD", "GBP", "USD"), ("EUR/USD", "EUR", "USD"), ("USD/JPY", "USD", "JPY")]
-RUN_INTERVAL_SECONDS = 60
+RUN_INTERVAL_SECONDS = 60  # TEMP: scan every 60 seconds
 
-# --- Data ---
+# --- DATA FUNCTIONS ---
 def get_cot_data(currency):
     code_map = {
         "EUR": "CHRIS/CME_EC1",
@@ -87,7 +87,7 @@ def get_retail_sentiment(pair):
     except:
         return {"long_percent": 50, "retail_against": False}
 
-# --- Static logic ---
+# --- STATIC PLACEHOLDER FUNCTIONS ---
 def get_central_bank_tone(currency):
     return {"tone": "hawkish", "recent_surprise": True}
 
@@ -100,9 +100,11 @@ def get_technical_pattern(pair):
 def get_upcoming_catalyst(pair):
     return {"event": "FOMC meeting", "bias_alignment": True}
 
-# --- Email ---
+# --- EMAIL FUNCTION ---
 def send_email_alert(pair, checklist, direction):
     confidence = len(checklist)
+    print(f"[DEBUG] Attempting to send email: {pair}, confluences: {confidence}")
+
     if confidence < 5:
         print(f"❌ Email BLOCKED — only {confidence}/7 confluences for {pair}")
         return
@@ -128,7 +130,7 @@ def send_email_alert(pair, checklist, direction):
         server.login(EMAIL_SENDER, EMAIL_PASSWORD)
         server.sendmail(EMAIL_SENDER, EMAIL_RECEIVER, msg.as_string())
 
-# --- Log ---
+# --- LOGGING FUNCTION ---
 def log_trade(pair, checklist):
     df = pd.DataFrame([{
         "timestamp": datetime.datetime.utcnow(),
@@ -143,7 +145,8 @@ def log_trade(pair, checklist):
         pass
     df.to_csv(LOG_FILE, index=False)
 
-# --- Scanner ---
+
+# --- TRADE SCANNER ---
 def scan_trade_opportunity(pair, base_ccy, quote_ccy):
     checklist = []
     base_strength = 0
@@ -170,13 +173,15 @@ def scan_trade_opportunity(pair, base_ccy, quote_ccy):
 
     if get_intermarket_agreement(pair):
         checklist.append("Intermarket correlation confirmed")
+
     if get_technical_pattern(pair)['key_level_broken']:
         checklist.append("Major S/R break or clean pattern")
+
     catalyst = get_upcoming_catalyst(pair)
     if catalyst['bias_alignment']:
         checklist.append(f"Catalyst aligns: {catalyst['event']}")
 
-    print("========= SCAN =========")
+    print("========= SCAN RESULT =========")
     print(f"Pair: {pair}")
     for item in checklist:
         print(f"✅ {item}")
@@ -191,15 +196,15 @@ def scan_trade_opportunity(pair, base_ccy, quote_ccy):
     else:
         print("❌ Not enough edge for swing entry")
 
-# --- Loop ---
+# --- RUN LOOP ---
 def auto_run_dashboard():
     while True:
-        print("================= DAILY SCAN =================")
+        print("========== STARTING NEW SCAN ==========")
         for pair, base, quote in TRADE_PAIRS:
             scan_trade_opportunity(pair, base, quote)
-            print("------------------------------------------------")
+            print("---------------------------------------")
         time.sleep(RUN_INTERVAL_SECONDS)
 
-# --- Start ---
+# --- ENTRY POINT ---
 if __name__ == "__main__":
     auto_run_dashboard()

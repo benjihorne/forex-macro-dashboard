@@ -1,10 +1,11 @@
 # === FULL MAIN.PY WITH 5-MINUTE SCANS AND FAIL-SAFE ===
+import datetime
 with open("boot_log.txt", "a") as f:
     f.write(f"✅ Booted at {datetime.datetime.utcnow()}\n")
+
 print("⚙️ main.py has started execution")
 import requests
 import pandas as pd
-import datetime
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart

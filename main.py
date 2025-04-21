@@ -1,20 +1,15 @@
-# === FULL MAIN.PY WITH 60-SECOND LOOP, NO SCHEDULE LIB ===
 import datetime
-with open("boot_log.txt", "a") as f:
-    f.write(f"✅ Booted at {datetime.datetime.utcnow()}\n")
-
-print("⚙️ main.py has started execution")
-import requests
-import pandas as pd
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from bs4 import BeautifulSoup
-import time
-import os
 import sys
-print("✅ All libraries imported")
-print(f"🛠 Running Python version: {sys.version}")
+print("🔥 BOT IS ALIVE")
+print(f"🕒 Time: {datetime.datetime.utcnow()}")
+print(f"🔧 Python version: {sys.version}")
+
+# Skip everything else for now just to confirm loop:
+import time
+while True:
+    print(f"✅ Still alive at {datetime.datetime.utcnow()}")
+    time.sleep(10)
+Running Python version: {sys.version}")
 
 # --- CONFIG ---
 EMAIL_SENDER = os.getenv("EMAIL_SENDER", "benjihornetrades@gmail.com")

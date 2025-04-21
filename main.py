@@ -204,4 +204,6 @@ def auto_run_dashboard():
         time.sleep(RUN_INTERVAL_SECONDS)
 
 if __name__ == "__main__":
+print("🚀 __main__ reached — beginning bot loop")
     auto_run_dashboard()
+

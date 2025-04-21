@@ -1,4 +1,4 @@
-# === FULL MAIN.PY WITH 5-MINUTE SCANS AND FAIL-SAFE ===
+# === FULL MAIN.PY WITH 5-MINUTE SCANS, LOGGING, AND FAIL-SAFE ===
 import datetime
 with open("boot_log.txt", "a") as f:
     f.write(f"✅ Booted at {datetime.datetime.utcnow()}\n")
@@ -139,12 +139,17 @@ def run_all_pairs():
 def auto_run_dashboard():
     print("📅 5-minute scanning activated")
     schedule.every(5).minutes.do(run_all_pairs)
+    last_log = datetime.datetime.utcnow()
     while True:
         try:
             schedule.run_pending()
+            now = datetime.datetime.utcnow()
+            if (now - last_log).seconds > 60:
+                print(f"⏳ Waiting... {now}")
+                last_log = now
         except Exception as loop_err:
             print(f"⚠️ Schedule loop error: {loop_err}")
-        time.sleep(30)
+        time.sleep(5)
 
 if __name__ == "__main__":
     print("🚀 __main__ reached — beginning bot loop")

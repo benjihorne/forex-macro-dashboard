@@ -23,7 +23,7 @@ LOG_FILE = "trade_log.csv"
 QUANDL_API_KEY = os.getenv("QUANDL_API_KEY", "jmA5k4Z8BwXLW_6hkw-2")
 FRED_API_KEY = os.getenv("FRED_API_KEY", "03041666822ce885ee3462500fa93cd5")
 TRADE_PAIRS = [("GBP/USD", "GBP", "USD"), ("EUR/USD", "EUR", "USD"), ("USD/JPY", "USD", "JPY")]
-RUN_INTERVAL_SECONDS = 3600  # hourly to prevent spam
+RUN_INTERVAL_SECONDS = 10  # hourly to prevent spam
 
 CENTRAL_BANK_TONE = {
     "USD": "hawkish",

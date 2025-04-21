@@ -25,7 +25,7 @@ TRADE_PAIRS = [
     ("EUR/USD", "EUR", "USD"),
     ("USD/JPY", "USD", "JPY")
 ]
-RUN_INTERVAL_SECONDS = 86400  # Run once per day
+RUN_INTERVAL_SECONDS = 60  # TEMP: scan every 60 seconds for testing
 
 # --- COT Data (Quandl) ---
 def get_cot_data(currency):
@@ -166,7 +166,7 @@ def scan_trade_opportunity(pair, base_ccy, quote_ccy):
     if catalyst['bias_alignment']:
         checklist.append(f"Catalyst aligns: {catalyst['event']}")
 
-    print("--- Forex Macro Dashboard ---")
+    print("================= DAILY SCAN =================")
     print(f"Pair: {pair}\n")
     for item in checklist:
         print(f"✅ {item}")

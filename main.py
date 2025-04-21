@@ -1,4 +1,4 @@
-# === FULL MAIN.PY WITH 5-MINUTE SCANS, LOGGING, AND FAIL-SAFE ===
+# === FULL MAIN.PY WITH 60-SECOND LOOP, NO SCHEDULE LIB ===
 import datetime
 with open("boot_log.txt", "a") as f:
     f.write(f"✅ Booted at {datetime.datetime.utcnow()}\n")
@@ -13,7 +13,6 @@ from bs4 import BeautifulSoup
 import time
 import os
 import sys
-import schedule
 print("✅ All libraries imported")
 print(f"🛠 Running Python version: {sys.version}")
 
@@ -39,7 +38,7 @@ CENTRAL_BANK_TONE = {
     "NZD": "neutral"
 }
 
-# [...unchanged utility functions get_cot_data to get_upcoming_catalyst remain as-is...]
+# [...functions for get_cot_data to get_upcoming_catalyst remain unchanged...]
 
 # --- EMAIL ---
 def send_email_alert(pair, checklist, direction):
@@ -137,19 +136,11 @@ def run_all_pairs():
         print("---------------------------------------")
 
 def auto_run_dashboard():
-    print("📅 5-minute scanning activated")
-    schedule.every(5).minutes.do(run_all_pairs)
-    last_log = datetime.datetime.utcnow()
+    print("🔁 60-second interval scan loop active")
     while True:
-        try:
-            schedule.run_pending()
-            now = datetime.datetime.utcnow()
-            if (now - last_log).seconds > 60:
-                print(f"⏳ Waiting... {now}")
-                last_log = now
-        except Exception as loop_err:
-            print(f"⚠️ Schedule loop error: {loop_err}")
-        time.sleep(5)
+        run_all_pairs()
+        print("🔄 Sleeping for 60 seconds...")
+        time.sleep(60)
 
 if __name__ == "__main__":
     print("🚀 __main__ reached — beginning bot loop")

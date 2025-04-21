@@ -1,4 +1,4 @@
-# === FULL MAIN.PY WITH UPGRADES ===
+# === FULL MAIN.PY WITH TIMED SCANS ===
 print("⚙️ main.py has started execution")
 import requests
 import pandas as pd
@@ -10,8 +10,8 @@ from bs4 import BeautifulSoup
 import time
 import os
 import sys
+import schedule
 print(f"🛠 Running Python version: {sys.version}")
-
 
 # --- CONFIG ---
 EMAIL_SENDER = os.getenv("EMAIL_SENDER", "benjihornetrades@gmail.com")
@@ -23,7 +23,6 @@ LOG_FILE = "trade_log.csv"
 QUANDL_API_KEY = os.getenv("QUANDL_API_KEY", "jmA5k4Z8BwXLW_6hkw-2")
 FRED_API_KEY = os.getenv("FRED_API_KEY", "03041666822ce885ee3462500fa93cd5")
 TRADE_PAIRS = [("GBP/USD", "GBP", "USD"), ("EUR/USD", "EUR", "USD"), ("USD/JPY", "USD", "JPY")]
-RUN_INTERVAL_SECONDS = 10  # hourly to prevent spam
 
 CENTRAL_BANK_TONE = {
     "USD": "hawkish",
@@ -36,7 +35,6 @@ CENTRAL_BANK_TONE = {
     "NZD": "neutral"
 }
 
-# --- DATA FUNCTIONS ---
 def get_cot_data(currency):
     code_map = {
         "EUR": "CHRIS/CME_EC1",
@@ -191,22 +189,29 @@ def scan_trade_opportunity(pair, base_ccy, quote_ccy):
         print(f"✅ {item}")
     print(f"Total confluences: {len(checklist)}")
     direction = "long" if base_strength >= quote_strength else "short"
-    if len(checklist) >= 2:
+    if len(checklist) >= 5:
         print(f"✅ TRADE VALIDATED ({len(checklist)}/7, {direction.upper()} {pair})")
         send_email_alert(pair, checklist, direction)
         log_trade(pair, checklist)
     else:
         print("❌ Not enough edge for swing entry")
 
+def run_all_pairs():
+    print(f"\n[SCAN START] {datetime.datetime.utcnow()} UTC")
+    for pair, base, quote in TRADE_PAIRS:
+        scan_trade_opportunity(pair, base, quote)
+        print("---------------------------------------")
+
 def auto_run_dashboard():
+    print("📅 Scheduled scanning activated")
+    schedule.every().day.at("06:00").do(run_all_pairs)
+    schedule.every().day.at("11:30").do(run_all_pairs)
+    schedule.every().day.at("13:30").do(run_all_pairs)
+    schedule.every().day.at("18:00").do(run_all_pairs)
     while True:
-        print(f"\n[SCAN START] {datetime.datetime.utcnow()} UTC")
-        for pair, base, quote in TRADE_PAIRS:
-            scan_trade_opportunity(pair, base, quote)
-            print("---------------------------------------")
-        time.sleep(RUN_INTERVAL_SECONDS)
+        schedule.run_pending()
+        time.sleep(30)
 
 if __name__ == "__main__":
     print("🚀 __main__ reached — beginning bot loop")
     auto_run_dashboard()
-

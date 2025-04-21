@@ -1,15 +1,15 @@
 import datetime
 import sys
+import time
+
 print("🔥 BOT IS ALIVE")
 print(f"🕒 Time: {datetime.datetime.utcnow()}")
 print(f"🔧 Python version: {sys.version}")
 
-# Skip everything else for now just to confirm loop:
-import time
 while True:
     print(f"✅ Still alive at {datetime.datetime.utcnow()}")
     time.sleep(10)
-Running Python version: {sys.version}")
+
 
 # --- CONFIG ---
 EMAIL_SENDER = os.getenv("EMAIL_SENDER", "benjihornetrades@gmail.com")

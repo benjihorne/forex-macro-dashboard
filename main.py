@@ -1,4 +1,6 @@
 # === FULL MAIN.PY WITH 5-MINUTE SCANS AND FAIL-SAFE ===
+with open("boot_log.txt", "a") as f:
+    f.write(f"✅ Booted at {datetime.datetime.utcnow()}\n")
 print("⚙️ main.py has started execution")
 import requests
 import pandas as pd

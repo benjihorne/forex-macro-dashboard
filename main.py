@@ -1,4 +1,3 @@
-# === FULL MAIN.PY WITH TIMED SCANS ===
 print("⚙️ main.py has started execution")
 import requests
 import pandas as pd
@@ -10,7 +9,11 @@ from bs4 import BeautifulSoup
 import time
 import os
 import sys
+print("✅ All standard libraries loaded")
+
 import schedule
+print("✅ schedule module imported successfully")
+
 print(f"🛠 Running Python version: {sys.version}")
 
 # --- CONFIG ---
@@ -203,11 +206,8 @@ def run_all_pairs():
         print("---------------------------------------")
 
 def auto_run_dashboard():
-    print("📅 Scheduled scanning activated")
-    schedule.every().day.at("06:00").do(run_all_pairs)
-    schedule.every().day.at("11:30").do(run_all_pairs)
-    schedule.every().day.at("13:30").do(run_all_pairs)
-    schedule.every().day.at("18:00").do(run_all_pairs)
+    print("📅 5-minute scanning activated")
+    schedule.every(5).minutes.do(run_all_pairs)
     while True:
         schedule.run_pending()
         time.sleep(30)

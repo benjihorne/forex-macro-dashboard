@@ -216,42 +216,47 @@ import numpy as np  # Make sure this is at the top of your file
 
 def get_technical_pattern(pair):
     try:
-        # Map Forex pairs to TwelveData format
-        td_symbols = {
-            "EUR/USD": "EUR/USD",
-            "GBP/USD": "GBP/USD",
-            "USD/JPY": "USD/JPY"
-        }
+        fmp_pair = pair.replace("/", "")
+        url = f"https://financialmodelingprep.com/api/v3/historical-chart/1hour/{fmp_pair}?apikey={FMP_API_KEY}"
+        res = requests.get(url).json()
+        if not isinstance(res, list) or len(res) < 10:
+            return {"key_level_broken": False, "clean_pattern": None}
 
-        symbol = td_symbols.get(pair)
-        if not symbol:
-            return {"key_level_broken": False, "clean_pattern": "unsupported pair"}
+        closes = [float(candle["close"]) for candle in res[:10]]
+        current = closes[0]
+        recent_high = max(closes[1:])
+        recent_low = min(closes[1:])
 
-        url = f"https://api.twelvedata.com/time_series?symbol={symbol}&interval=1h&outputsize=50&apikey=7e69098ce083444684fb4d5d601598b8"
-        response = requests.get(url)
-        data = response.json()
-
-        if "values" not in data:
-            return {"key_level_broken": False, "clean_pattern": "bad data"}
-
-        closes = [float(entry["close"]) for entry in reversed(data["values"])]
-        ema21 = pd.Series(closes).ewm(span=21).mean().iloc[-1]
-
-        if closes[-1] > ema21 and closes[-1] > closes[-2]:
+        if current > recent_high:
             return {"key_level_broken": True, "clean_pattern": "bullish breakout"}
-        elif closes[-1] < ema21 and closes[-1] < closes[-2]:
+        elif current < recent_low:
             return {"key_level_broken": True, "clean_pattern": "bearish breakdown"}
         else:
-            return {"key_level_broken": False, "clean_pattern": "neutral"}
-
+            return {"key_level_broken": False, "clean_pattern": "range"}
     except Exception as e:
-        print(f"⚠️ Technical pattern error: {e}", flush=True)
-        return {"key_level_broken": False, "clean_pattern": "error"}
-
-
+        print(f"⚠️ Technical pattern fetch error: {e}")
+        return {"key_level_broken": False, "clean_pattern": None}
 
 def get_upcoming_catalyst(pair):
-    return {"event": "FOMC meeting", "bias_alignment": True}
+    try:
+        url = f"https://financialmodelingprep.com/api/v4/economic_calendar?from={datetime.date.today()}&to={datetime.date.today()}&apikey={FMP_API_KEY}"
+        res = requests.get(url).json()
+        base, quote = pair.split("/")
+
+        upcoming_events = [
+            ev for ev in res if ev.get("country") in [base, quote]
+            and ev.get("impact") == "High"
+        ]
+
+        if upcoming_events:
+            event_names = [ev["event"] for ev in upcoming_events]
+            return {"event": f"{', '.join(event_names)}", "bias_alignment": True}
+        else:
+            return {"event": "None", "bias_alignment": False}
+    except Exception as e:
+        print(f"⚠️ Catalyst fetch error: {e}")
+        return {"event": "Error fetching", "bias_alignment": False}
+
 
 def send_email_alert(pair, checklist, direction):
     confidence = len(checklist)

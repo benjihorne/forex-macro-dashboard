@@ -310,7 +310,7 @@ def get_upcoming_catalyst(pair):
 def send_email_alert(pair, checklist, direction):
     confidence = len(checklist)
     print(f"[DEBUG] Attempting to send email: {pair}, confluences: {confidence}")
-    if confidence < 5:
+    if confidence < 4:
         print(f"❌ Email BLOCKED — only {confidence}/7 confluences for {pair}")
         return
     msg = MIMEMultipart("alternative")

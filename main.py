@@ -116,14 +116,60 @@ def get_central_bank_tone(currency):
     recent_surprise = tone in ["hawkish", "dovish"]
     return {"tone": tone, "recent_surprise": recent_surprise}
 
-def get_intermarket_agreement(pair):
+FMP_API_KEY = "czVnLpLUT3GA7bsOP6yci0eMStqe3hPQ"
+
+def get_intermarket_agreement(pair, cached_assets={}):
     try:
-        td_assets = {
-    "CAD": {"symbol": "WTICOUSD", "name": "Crude Oil"},         # Replaces CL=F
-    "AUD": {"symbol": "COPPER/USD", "name": "Copper"},         # Replaces HG=F
-    "CHF": {"symbol": "XAU/USD", "name": "Gold"},              # Already valid
-    "JPY": {"symbol": "US10Y", "name": "US 10Y Yield"}         # Leave for now, we'll test
-}
+        fmp_assets = {
+            "CAD": {"symbol": "WTI_OIL", "name": "Crude Oil"},
+            "AUD": {"symbol": "COPPER", "name": "Copper"},
+            "CHF": {"symbol": "GOLD", "name": "Gold"},
+            "JPY": {"symbol": "US10Y", "name": "10Y Treasury"}
+        }
+
+        base, quote = pair.split("/")
+
+        confluences = []
+
+        for side in [base, quote]:
+            asset = fmp_assets.get(side)
+            if not asset:
+                print(f"❌ No intermarket logic for {side}", flush=True)
+                continue
+
+            symbol = asset["symbol"]
+            name = asset["name"]
+
+            if symbol in cached_assets:
+                data = cached_assets[symbol]
+            else:
+                url = f"https://financialmodelingprep.com/api/v3/quote/{symbol}?apikey={FMP_API_KEY}"
+                res = requests.get(url).json()
+                if not res or "changesPercentage" not in res[0]:
+                    print(f"⚠️ Intermarket data not available for {symbol}", flush=True)
+                    continue
+                data = res[0]
+                cached_assets[symbol] = data  # Save it for reuse
+
+            percent = float(data["changesPercentage"])
+            print(f"🔢 {name} change: {percent:.2f}% for {side}", flush=True)
+
+            if side == base and percent > 0.5:
+                confluences.append(f"{side} supported by {name}")
+            elif side == quote and percent < -0.5:
+                confluences.append(f"{side} weakness from {name}")
+
+        if confluences:
+            print(f"✅ Intermarket agreement confirmed: {' & '.join(confluences)}", flush=True)
+            return True
+        else:
+            print("❌ No intermarket alignment confirmed", flush=True)
+            return False
+
+    except Exception as e:
+        print(f"⚠️ Intermarket agreement error: {e}", flush=True)
+        return False
+
 
 
         base, quote = pair.split("/")

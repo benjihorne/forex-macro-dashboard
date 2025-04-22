@@ -239,31 +239,39 @@ def get_technical_pattern(pair):
 
 def get_upcoming_catalyst(pair):
     try:
-        today = datetime.date.today()
-        url = f"https://financialmodelingprep.com/api/v4/economic_calendar?from={today}&to={today}&apikey={FMP_API_KEY}"
-        res = requests.get(url).json()
-
-        if not isinstance(res, list):
-            print("⚠️ Unexpected catalyst response format")
-            return {"event": "Invalid data", "bias_alignment": False}
-
         base, quote = pair.split("/")
-        currencies = [base, quote]
+        url = "https://nfs.faireconomy.media/ff_calendar_thisweek.json"
+        response = requests.get(url, timeout=10)
 
-        high_impact = [
-            ev for ev in res
-            if isinstance(ev, dict) and ev.get("country") in currencies and ev.get("impact") == "High"
-        ]
+        try:
+            events = response.json()
+        except Exception as e:
+            print(f"⚠️ Failed to parse catalyst JSON: {e}")
+            return {"event": None, "bias_alignment": False}
 
-        if high_impact:
-            event_names = [ev["event"] for ev in high_impact if "event" in ev]
-            print(f"📅 Upcoming high-impact events for {pair}: {', '.join(event_names)}", flush=True)
-            return {"event": f"{', '.join(event_names)}", "bias_alignment": True}
-        else:
-            return {"event": "None", "bias_alignment": False}
+        now = datetime.datetime.utcnow()
+        for event in events:
+            if not isinstance(event, dict):
+                continue
+            if event.get("impact") != "High":
+                continue
+            if event.get("country") not in [base, quote]:
+                continue
+            ts = event.get("timestamp")
+            if not isinstance(ts, int):
+                continue
+            event_time = datetime.datetime.utcfromtimestamp(ts)
+            delta = (event_time - now).total_seconds()
+            if 0 <= delta <= 86400:  # Within next 24h
+                print(f"📅 Upcoming catalyst for {pair}: {event.get('title')} ({event.get('country')})")
+                return {"event": event.get("title"), "bias_alignment": True}
+
+        return {"event": None, "bias_alignment": False}
+
     except Exception as e:
-        print(f"⚠️ Catalyst fetch error: {e}", flush=True)
-        return {"event": "Error fetching", "bias_alignment": False}
+        print(f"⚠️ Catalyst fetch error: {e}")
+        return {"event": None, "bias_alignment": False}
+
 
 def send_email_alert(pair, checklist, direction):
     confidence = len(checklist)

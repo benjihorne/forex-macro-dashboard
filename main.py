@@ -119,64 +119,63 @@ def get_central_bank_tone(currency):
 
 FMP_API_KEY = "czVnLpLUT3GA7bsOP6yci0eMStqe3hPQ"
 
-def get_intermarket_agreement(pair, cached_assets={}):
-    try:
-        # Asset map by currency or general macro sentiment
-        fmp_assets = {
-            "CAD": {"symbol": "CL", "name": "Crude Oil"},
-            "AUD": {"symbol": "HG", "name": "Copper"},
-            "CHF": {"symbol": "GC", "name": "Gold"},
-            "JPY": {"symbol": "GC", "name": "Gold"},
-            "JPY_VIX": {"symbol": "^VIX", "name": "VIX Index"},
-            "CHF_VIX": {"symbol": "^VIX", "name": "VIX Index"},
-            "AUD_CHINA": {"symbol": "000001.SS", "name": "Shanghai Composite Index"}
-        }
+cached_assets = {}
 
+def fetch_change(symbol, label):
+    try:
+        if symbol in cached_assets:
+            return cached_assets[symbol]
+        url = f"https://financialmodelingprep.com/api/v3/quote/{symbol}?apikey=czVnLpLUT3GA7bsOP6yci0eMStqe3hPQ"
+        res = requests.get(url).json()
+        if not res or not isinstance(res, list) or "changesPercentage" not in res[0]:
+            print(f"⚠️ Intermarket data not available for {symbol}", flush=True)
+            return None
+        change = float(res[0]["changesPercentage"])
+        cached_assets[symbol] = change
+        print(f"🔢 {label} change: {change:.2f}%", flush=True)
+        return change
+    except Exception as e:
+        print(f"⚠️ Intermarket fetch error for {symbol}: {e}", flush=True)
+        return None
+
+def get_intermarket_agreement(pair):
+    try:
         base, quote = pair.split("/")
         confluences = []
 
-        # Function to fetch and cache asset percent changes
-        def fetch_change(symbol, label):
-            if symbol in cached_assets:
-                return cached_assets[symbol]
-            url = f"https://financialmodelingprep.com/api/v3/quote/{symbol}?apikey={FMP_API_KEY}"
-            res = requests.get(url).json()
-            if not res or "changesPercentage" not in res[0]:
-                print(f"⚠️ Intermarket data not available for {symbol}", flush=True)
-                return None
-            change = float(res[0]["changesPercentage"])
-            cached_assets[symbol] = change
-            print(f"🔢 {label} change: {change:.2f}%", flush=True)
-            return change
+        asset_map = {
+            "CAD": ("CL=F", "Crude Oil"),
+            "AUD": ("HG=F", "Copper"),
+            "CHF": ("GC=F", "Gold"),
+            "JPY": ("GC=F", "Gold"),
+            "USD": ("DX-Y.NYB", "US Dollar Index (DXY)"),
+            "EUR": ("^GDAXI", "German DAX Index"),
+            "GBP": ("^FTSE", "FTSE 100 Index")
+        }
 
-        # Base/Quote specific logic
         for side in [base, quote]:
-            if side in fmp_assets:
-                asset = fmp_assets[side]
-                change = fetch_change(asset["symbol"], asset["name"])
+            if side in asset_map:
+                symbol, label = asset_map[side]
+                change = fetch_change(symbol, label)
                 if change is not None:
                     if side == base and change > 0.5:
-                        confluences.append(f"{side} supported by {asset['name']}")
+                        confluences.append(f"{side} supported by {label}")
                     elif side == quote and change < -0.5:
-                        confluences.append(f"{side} weakness from {asset['name']}")
+                        confluences.append(f"{side} weakness from {label}")
             else:
                 print(f"❌ No intermarket logic for {side}", flush=True)
 
-        # VIX: If VIX ↑ → JPY/CHF strength
-        if base in ["JPY", "CHF"]:
-            vix_change = fetch_change("^VIX", "VIX")
-            if vix_change is not None and vix_change > 2:
-                confluences.append(f"{base} supported by risk-off (VIX ↑)")
+        if base in ["JPY", "CHF"] or quote in ["JPY", "CHF"]:
+            vix = fetch_change("^VIX", "VIX")
+            if vix is not None and vix > 2:
+                if base in ["JPY", "CHF"]:
+                    confluences.append(f"{base} supported by risk-off (VIX ↑)")
+                if quote in ["JPY", "CHF"]:
+                    confluences.append(f"{quote} weakness from risk-off (VIX ↑)")
 
-        if quote in ["JPY", "CHF"]:
-            vix_change = fetch_change("^VIX", "VIX")
-            if vix_change is not None and vix_change > 2:
-                confluences.append(f"{quote} weakness from risk-off (VIX ↑)")
-
-        # Shanghai for AUD strength
         if base == "AUD":
-            china_change = fetch_change("000001.SS", "Shanghai Index")
-            if china_change is not None and china_change > 0.5:
+            china = fetch_change("000001.SS", "Shanghai Index")
+            if china is not None and china > 0.5:
                 confluences.append("AUD strength from China optimism")
 
         if confluences:
@@ -185,10 +184,10 @@ def get_intermarket_agreement(pair, cached_assets={}):
         else:
             print("❌ No intermarket alignment confirmed", flush=True)
             return False
-
     except Exception as e:
         print(f"⚠️ Intermarket agreement error: {e}", flush=True)
         return False
+
 
 
 

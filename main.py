@@ -202,10 +202,14 @@ def scan_trade_opportunity(pair, base_ccy, quote_ccy):
 def auto_run_dashboard():
     print("🚀 __main__ reached — beginning bot loop", flush=True)
     while True:
-        print(f"\n[SCAN START] {datetime.datetime.utcnow()} UTC")
+        print("🌀 Loop tick...", flush=True)  # <-- ADD THIS
+        print(f"\n[SCAN START] {datetime.datetime.utcnow()} UTC", flush=True)
         for pair, base, quote in TRADE_PAIRS:
-            scan_trade_opportunity(pair, base, quote)
-            print("---------------------------------------")
+            try:
+                scan_trade_opportunity(pair, base, quote)
+            except Exception as e:
+                print(f"⚠️ Error during scan: {e}", flush=True)
+            print("---------------------------------------", flush=True)
         time.sleep(RUN_INTERVAL_SECONDS)
 
 if __name__ == "__main__":

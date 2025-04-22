@@ -59,22 +59,28 @@ def get_cot_data(currency):
         "JPY": "CHRIS/CME_JY1",
         "AUD": "CHRIS/CME_AD1",
         "CAD": "CHRIS/CME_CD1",
-        "CHF": "CHRIS/CME_SF1"
+        "CHF": "CHRIS/CME_SF1",
+        "NZD": "CHRIS/CME_NE1"
     }
     try:
         code = code_map.get(currency.upper())
         if not code:
+            print(f"❌ No COT code for {currency}")
             return {"net_spec_position": 0, "extreme_zscore": 0.0}
         url = f"https://www.quandl.com/api/v3/datasets/{code}.json?api_key={QUANDL_API_KEY}&rows=20"
         response = requests.get(url)
+        if response.status_code != 200:
+            print(f"⚠️ COT data fetch error for {currency}: {response.status_code}")
+            return {"net_spec_position": 0, "extreme_zscore": 0.0}
         data = response.json()["dataset"]["data"]
         df = pd.DataFrame(data, columns=response.json()["dataset"]["column_names"])
         spec_net = df["Net Position"] if "Net Position" in df.columns else df.iloc[:, -1]
         zscore = (spec_net.iloc[0] - spec_net.mean()) / spec_net.std()
         return {"net_spec_position": spec_net.iloc[0], "extreme_zscore": round(zscore, 2)}
     except Exception as e:
-        print(f"⚠️ COT data fetch error for {currency}: {e}", flush=True)
+        print(f"⚠️ COT fetch error for {currency}: {e}", flush=True)
         return {"net_spec_position": 0, "extreme_zscore": 0.0}
+
 
 
 def get_yield_spread(ccy1, ccy2):
@@ -229,12 +235,11 @@ def get_technical_pattern(pair):
         symbol = f"{base}{quote}=X"
         url = f"https://financialmodelingprep.com/api/v3/historical-chart/5min/{symbol}?apikey={FMP_API_KEY}"
         res = requests.get(url).json()
-
-        if not isinstance(res, list):
-            print(f"⚠️ Technical pattern fetch failed for {pair}: {res}", flush=True)
-            return {"key_level_broken": False, "clean_pattern": "invalid response"}
-
         df = pd.DataFrame(res)
+
+        if df.empty or "close" not in df.columns:
+            return {"key_level_broken": False, "clean_pattern": "data unavailable"}
+
         df["datetime"] = pd.to_datetime(df["date"])
         df.set_index("datetime", inplace=True)
         closes = df["close"].sort_index()
@@ -245,9 +250,9 @@ def get_technical_pattern(pair):
         recent = closes[-20:]
         ma = recent.rolling(window=10).mean()
 
-        if recent[-1] > ma[-1] and recent[-2] < ma[-2]:
+        if recent.iloc[-1] > ma.iloc[-1] and recent.iloc[-2] < ma.iloc[-2]:
             return {"key_level_broken": True, "clean_pattern": "bullish breakout"}
-        elif recent[-1] < ma[-1] and recent[-2] > ma[-2]:
+        elif recent.iloc[-1] < ma.iloc[-1] and recent.iloc[-2] > ma.iloc[-2]:
             return {"key_level_broken": True, "clean_pattern": "bearish breakdown"}
 
         return {"key_level_broken": False, "clean_pattern": "range-bound"}
@@ -258,32 +263,40 @@ def get_technical_pattern(pair):
 
 
 
+
 def get_upcoming_catalyst(pair):
     try:
         base, quote = pair.split("/")
-        ccys = [base, quote]
-        fmp_url = f"https://financialmodelingprep.com/api/v3/economic_calendar?apikey={FMP_API_KEY}"
-        res = requests.get(fmp_url).json()
+        currencies = [base, quote]
 
+        url = f"https://financialmodelingprep.com/api/v3/economic_calendar?apikey={FMP_API_KEY}"
+        res = requests.get(url)
+        if res.status_code != 200:
+            print(f"⚠️ Catalyst fetch error: {res.status_code}")
+            return {"event": None, "bias_alignment": False}
+
+        data = res.json()
         now = datetime.datetime.utcnow()
-        upcoming = [x for x in res if "date" in x and datetime.datetime.strptime(x["date"], "%Y-%m-%d %H:%M:%S") >= now]
+        upcoming = []
 
-        catalyst_hits = []
-        for event in upcoming:
-            if "country" not in event or "event" not in event:
+        for event in data:
+            try:
+                event_time = datetime.datetime.strptime(event["date"], "%Y-%m-%d %H:%M:%S")
+                if now <= event_time <= now + datetime.timedelta(hours=48):
+                    if event["country"] in currencies or event["currency"] in currencies:
+                        upcoming.append(event["event"])
+            except Exception:
                 continue
-            if event["country"] in ccys or any(ccy in event["event"] for ccy in ccys):
-                catalyst_hits.append(event["event"])
 
-        if catalyst_hits:
-            print(f"🧭 Upcoming catalysts: {catalyst_hits}", flush=True)
-            return {"event": ", ".join(catalyst_hits[:2]), "bias_alignment": True}
-
-        return {"event": "No major events", "bias_alignment": False}
+        if upcoming:
+            return {"event": ", ".join(upcoming), "bias_alignment": True}
+        else:
+            return {"event": None, "bias_alignment": False}
 
     except Exception as e:
-        print(f"⚠️ Catalyst fetch error: {e}", flush=True)
-        return {"event": "unknown", "bias_alignment": False}
+        print(f"⚠️ Catalyst fetch error: {e}")
+        return {"event": None, "bias_alignment": False}
+
 
 
 def send_email_alert(pair, checklist, direction):

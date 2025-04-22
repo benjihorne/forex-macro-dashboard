@@ -27,9 +27,14 @@ TRADE_PAIRS = [
     ("GBP/USD", "GBP", "USD"),
     ("EUR/USD", "EUR", "USD"),
     ("USD/JPY", "USD", "JPY"),
-    ("USD/CAD", "USD", "CAD"),     # 🛢 Crude Oil driver for CAD
-    ("AUD/USD", "AUD", "USD")      # 🔩 Copper driver for AUD
+    ("USD/CAD", "USD", "CAD"),
+    ("AUD/USD", "AUD", "USD"),
+    ("NZD/USD", "NZD", "USD"),
+    ("USD/CHF", "USD", "CHF"),
+    ("EUR/GBP", "EUR", "GBP"),
+    ("GBP/JPY", "GBP", "JPY")
 ]
+
 
 RUN_INTERVAL_SECONDS = 60  # safer scan interval to avoid Render throttling
 
@@ -45,16 +50,19 @@ CENTRAL_BANK_TONE = {
     "NZD": "neutral"
 }
 
+
 # --- DATA FUNCTIONS ---
 def get_cot_data(currency):
-    code_map = {
-        "EUR": "CHRIS/CME_EC1",
-        "GBP": "CHRIS/CME_BP1",
-        "JPY": "CHRIS/CME_JY1",
-        "AUD": "CHRIS/CME_AD1",
-        "CAD": "CHRIS/CME_CD1",
-        "CHF": "CHRIS/CME_SF1"
-    }
+  code_map = {
+    "EUR": "CHRIS/CME_EC1",
+    "GBP": "CHRIS/CME_BP1",
+    "JPY": "CHRIS/CME_JY1",
+    "AUD": "CHRIS/CME_AD1",
+    "CAD": "CHRIS/CME_CD1",
+    "CHF": "CHRIS/CME_SF1",
+    "NZD": "CHRIS/CME_NE1"  # If available, else skip this one
+}
+
     try:
         code = code_map.get(currency.upper())
         if not code:

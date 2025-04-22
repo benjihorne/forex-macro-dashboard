@@ -257,6 +257,7 @@ def get_technical_pattern(pair):
         return {"key_level_broken": False, "clean_pattern": "error"}
 
 
+
 def get_upcoming_catalyst(pair):
     try:
         base, quote = pair.split("/")

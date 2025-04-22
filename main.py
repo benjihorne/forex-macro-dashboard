@@ -241,40 +241,27 @@ def get_upcoming_catalyst(pair):
     try:
         base, quote = pair.split("/")
         currencies = [base, quote]
+
         url = f"https://financialmodelingprep.com/api/v4/economic_calendar?apikey={FMP_API_KEY}"
-        response = requests.get(url)
-        if response.status_code != 200:
-            print("⚠️ Failed to fetch catalyst data")
-            return {"event": None, "bias_alignment": False}
+        res = requests.get(url).json()
 
-        events = response.json()
-        now = datetime.datetime.utcnow()
-        next_48h = now + datetime.timedelta(hours=48)
+        relevant_events = []
+        for event in res:
+            if event["country"] in currencies:
+                impact = event.get("impact", "").lower()
+                if "high" in impact or "medium" in impact:
+                    relevant_events.append(event)
 
-        for event in events:
-            try:
-                currency = event.get("countryCode", "")
-                time_str = event.get("date", "") + " " + event.get("time", "00:00")
-                event_time = datetime.datetime.strptime(time_str, "%Y-%m-%d %H:%M")
-                impact = event.get("impact", "low").lower()
+        if not relevant_events:
+            print("❌ No aligned catalysts found")
+            return {"event": "none", "bias_alignment": False}
 
-                if any(cur in currency for cur in currencies) and event_time <= next_48h:
-                    if impact in ["medium", "high"]:
-                        print(f"📆 Upcoming catalyst for {pair}: {event.get('event')}", flush=True)
-                        return {
-                            "event": event.get("event", "Unknown event"),
-                            "bias_alignment": True
-                        }
-            except Exception as inner_e:
-                print(f"⚠️ Error parsing individual event: {inner_e}")
-                continue
-
-        print("❌ No aligned catalysts found", flush=True)
-        return {"event": None, "bias_alignment": False}
+        print(f"✅ Upcoming catalyst(s) found: {len(relevant_events)}")
+        return {"event": relevant_events[0]["event"], "bias_alignment": True}
 
     except Exception as e:
-        print(f"⚠️ Catalyst fetch error: {e}", flush=True)
-        return {"event": None, "bias_alignment": False}
+        print(f"⚠️ Catalyst fetch error: {e}")
+        return {"event": "error", "bias_alignment": False}
 
 def send_email_alert(pair, checklist, direction):
     confidence = len(checklist)

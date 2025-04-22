@@ -22,7 +22,14 @@ SMTP_PORT = 587
 LOG_FILE = "trade_log.csv"
 QUANDL_API_KEY = os.getenv("QUANDL_API_KEY", "jmA5k4Z8BwXLW_6hkw-2")
 FRED_API_KEY = os.getenv("FRED_API_KEY", "03041666822ce885ee3462500fa93cd5")
-TRADE_PAIRS = [("GBP/USD", "GBP", "USD"), ("EUR/USD", "EUR", "USD"), ("USD/JPY", "USD", "JPY")]
+TRADE_PAIRS = [
+    ("GBP/USD", "GBP", "USD"),
+    ("EUR/USD", "EUR", "USD"),
+    ("USD/JPY", "USD", "JPY"),
+    ("USD/CAD", "USD", "CAD"),     # 🛢 Crude Oil driver for CAD
+    ("AUD/USD", "AUD", "USD")      # 🔩 Copper driver for AUD
+]
+
 RUN_INTERVAL_SECONDS = 60  # safer scan interval to avoid Render throttling
 
 

@@ -25,8 +25,6 @@ FRED_API_KEY = os.getenv("FRED_API_KEY", "03041666822ce885ee3462500fa93cd5")
 TRADE_PAIRS = [("GBP/USD", "GBP", "USD"), ("EUR/USD", "EUR", "USD"), ("USD/JPY", "USD", "JPY")]
 RUN_INTERVAL_SECONDS = 60  # safer scan interval to avoid Render throttling
 
-print("🚀 __main__ reached — beginning bot loop", flush=True)
-
 
 CENTRAL_BANK_TONE = {
     "USD": "hawkish",
@@ -202,6 +200,7 @@ def scan_trade_opportunity(pair, base_ccy, quote_ccy):
         print("❌ Not enough edge for swing entry")
 
 def auto_run_dashboard():
+    print("🚀 __main__ reached — beginning bot loop", flush=True)
     while True:
         print(f"\n[SCAN START] {datetime.datetime.utcnow()} UTC")
         for pair, base, quote in TRADE_PAIRS:
@@ -210,6 +209,5 @@ def auto_run_dashboard():
         time.sleep(RUN_INTERVAL_SECONDS)
 
 if __name__ == "__main__":
-    print("🚀 __main__ reached — beginning bot loop")
     auto_run_dashboard()
 

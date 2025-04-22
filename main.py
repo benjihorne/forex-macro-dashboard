@@ -143,7 +143,7 @@ def get_intermarket_agreement(pair):
         base, quote = pair.split("/")
         confluences = []
 
- def get_intermarket_agreement(pair):
+def get_intermarket_agreement(pair):
     try:
         base, quote = pair.split("/")
         confluences = []
@@ -161,8 +161,6 @@ def get_intermarket_agreement(pair):
             "AUD_CHINA": ("SSEC", "Shanghai Composite Index")
         }
 
-
-
         for side in [base, quote]:
             if side in asset_map:
                 symbol, label = asset_map[side]
@@ -176,7 +174,7 @@ def get_intermarket_agreement(pair):
                 print(f"❌ No intermarket logic for {side}", flush=True)
 
         if base in ["JPY", "CHF"] or quote in ["JPY", "CHF"]:
-            vix = fetch_change("^VIX", "VIX")
+            vix = fetch_change("VXX", "VIX Proxy")
             if vix is not None and vix > 2:
                 if base in ["JPY", "CHF"]:
                     confluences.append(f"{base} supported by risk-off (VIX ↑)")
@@ -184,7 +182,7 @@ def get_intermarket_agreement(pair):
                     confluences.append(f"{quote} weakness from risk-off (VIX ↑)")
 
         if base == "AUD":
-            china = fetch_change("000001.SS", "Shanghai Index")
+            china = fetch_change("SSEC", "Shanghai Composite Index")
             if china is not None and china > 0.5:
                 confluences.append("AUD strength from China optimism")
 

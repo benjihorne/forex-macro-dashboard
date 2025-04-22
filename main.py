@@ -68,19 +68,13 @@ def get_cot_data(currency):
         if not code:
             print(f"❌ No COT code for {currency}")
             return {"net_spec_position": 0, "extreme_zscore": 0.0}
-        url = f"https://www.quandl.com/api/v3/datasets/{code}.json?api_key={QUANDL_API_KEY}&rows=20"
-        response = requests.get(url)
-        if response.status_code != 200:
-            print(f"⚠️ COT data fetch error for {currency}: {response.status_code}")
-            return {"net_spec_position": 0, "extreme_zscore": 0.0}
-        data = response.json()["dataset"]["data"]
-        df = pd.DataFrame(data, columns=response.json()["dataset"]["column_names"])
-        spec_net = df["Net Position"] if "Net Position" in df.columns else df.iloc[:, -1]
-        zscore = (spec_net.iloc[0] - spec_net.mean()) / spec_net.std()
-        return {"net_spec_position": spec_net.iloc[0], "extreme_zscore": round(zscore, 2)}
-    except Exception as e:
-        print(f"⚠️ COT fetch error for {currency}: {e}", flush=True)
-        return {"net_spec_position": 0, "extreme_zscore": 0.0}
+        url = f"https://data.nasdaq.com/api/v3/datasets/{code}.json?api_key={QUANDL_API_KEY}"
+response = requests.get(url)
+if response.status_code != 200:
+    raise Exception(f"Nasdaq API error: {response.status_code} - {response.text}")
+data = response.json()["dataset"]["data"]
+df = pd.DataFrame(data, columns=response.json()["dataset"]["column_names"])
+
 
 
 

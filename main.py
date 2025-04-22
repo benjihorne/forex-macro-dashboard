@@ -53,16 +53,14 @@ CENTRAL_BANK_TONE = {
 
 # --- DATA FUNCTIONS ---
 def get_cot_data(currency):
-  code_map = {
-    "EUR": "CHRIS/CME_EC1",
-    "GBP": "CHRIS/CME_BP1",
-    "JPY": "CHRIS/CME_JY1",
-    "AUD": "CHRIS/CME_AD1",
-    "CAD": "CHRIS/CME_CD1",
-    "CHF": "CHRIS/CME_SF1",
-    "NZD": "CHRIS/CME_NE1"  # If available, else skip this one
-}
-
+    code_map = {
+        "EUR": "CHRIS/CME_EC1",
+        "GBP": "CHRIS/CME_BP1",
+        "JPY": "CHRIS/CME_JY1",
+        "AUD": "CHRIS/CME_AD1",
+        "CAD": "CHRIS/CME_CD1",
+        "CHF": "CHRIS/CME_SF1"
+    }
     try:
         code = code_map.get(currency.upper())
         if not code:
@@ -74,8 +72,10 @@ def get_cot_data(currency):
         spec_net = df["Net Position"] if "Net Position" in df.columns else df.iloc[:, -1]
         zscore = (spec_net.iloc[0] - spec_net.mean()) / spec_net.std()
         return {"net_spec_position": spec_net.iloc[0], "extreme_zscore": round(zscore, 2)}
-    except:
+    except Exception as e:
+        print(f"⚠️ COT data fetch error for {currency}: {e}", flush=True)
         return {"net_spec_position": 0, "extreme_zscore": 0.0}
+
 
 def get_yield_spread(ccy1, ccy2):
     fred_series = {

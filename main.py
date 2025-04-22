@@ -139,25 +139,38 @@ import numpy as np  # Make sure this is at the top of your file
 
 def get_technical_pattern(pair):
     try:
-        # Temporary mock price data — replace with real candle data later
-        closes = np.array([1.25, 1.26, 1.27, 1.28, 1.29, 1.30])  # Simulate 6 closing prices
+        # Map Forex pairs to TwelveData format
+        td_symbols = {
+            "EUR/USD": "EUR/USD",
+            "GBP/USD": "GBP/USD",
+            "USD/JPY": "USD/JPY"
+        }
+
+        symbol = td_symbols.get(pair)
+        if not symbol:
+            return {"key_level_broken": False, "clean_pattern": "unsupported pair"}
+
+        url = f"https://api.twelvedata.com/time_series?symbol={symbol}&interval=1h&outputsize=50&apikey=7e69098ce083444684fb4d5d601598b8"
+        response = requests.get(url)
+        data = response.json()
+
+        if "values" not in data:
+            return {"key_level_broken": False, "clean_pattern": "bad data"}
+
+        closes = [float(entry["close"]) for entry in reversed(data["values"])]
         ema21 = pd.Series(closes).ewm(span=21).mean().iloc[-1]
 
-        pattern = {}
         if closes[-1] > ema21 and closes[-1] > closes[-2]:
-            pattern["key_level_broken"] = True
-            pattern["clean_pattern"] = "bullish breakout"
+            return {"key_level_broken": True, "clean_pattern": "bullish breakout"}
         elif closes[-1] < ema21 and closes[-1] < closes[-2]:
-            pattern["key_level_broken"] = True
-            pattern["clean_pattern"] = "bearish breakdown"
+            return {"key_level_broken": True, "clean_pattern": "bearish breakdown"}
         else:
-            pattern["key_level_broken"] = False
-            pattern["clean_pattern"] = "neutral"
+            return {"key_level_broken": False, "clean_pattern": "neutral"}
 
-        return pattern
     except Exception as e:
         print(f"⚠️ Technical pattern error: {e}", flush=True)
         return {"key_level_broken": False, "clean_pattern": "error"}
+
 
 
 def get_upcoming_catalyst(pair):

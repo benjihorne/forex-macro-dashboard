@@ -111,28 +111,39 @@ def get_central_bank_tone(currency):
 
 def get_intermarket_agreement(pair):
     try:
-        intermarket_data = {
-            "CAD": ("https://www.investing.com/commodities/crude-oil", "oil"),
-            "AUD": ("https://www.investing.com/commodities/copper", "copper"),
-            "JPY": ("https://www.investing.com/rates-bonds/u.s.-10-year-bond-yield", "us10y"),
-            "CHF": ("https://www.investing.com/commodities/gold", "gold")
+        td_assets = {
+            "CAD": {"symbol": "CL=F", "name": "Crude Oil"},    # WTI
+            "AUD": {"symbol": "HG=F", "name": "Copper"},       # Copper
+            "CHF": {"symbol": "XAU/USD", "name": "Gold"},      # Gold
+            "JPY": {"symbol": "US10Y", "name": "US 10Y Yield"} # US10Y
         }
 
-        base_ccy = pair.split("/")[0]
-        quote_ccy = pair.split("/")[1]
-        driver = intermarket_data.get(base_ccy, None)
+        base = pair.split("/")[0]
+        quote = pair.split("/")[1]
 
+        driver = td_assets.get(base)
         if not driver:
-            return False  # no intermarket logic defined
+            return False  # No intermarket logic for this base currency
 
-        # 🔧 Temporary mock — replace with real price fetch logic later
-        mock_daily_change_percent = 1.3  # Pretend oil is up 1.3%
+        symbol = driver["symbol"]
 
-        return mock_daily_change_percent > 1.0
+        url = f"https://api.twelvedata.com/quote?symbol={symbol}&apikey=7e69098ce083444684fb4d5d601598b8"
+        res = requests.get(url).json()
+
+        if "percent_change" not in res:
+            print(f"⚠️ Intermarket data not available for {symbol}")
+            return False
+
+        percent = float(res["percent_change"])
+        print(f"🔗 {driver['name']} change: {percent:.2f}% for {base}", flush=True)
+
+        # Confirmation logic: intermarket asset must be rising
+        return percent > 0.5
 
     except Exception as e:
-        print(f"⚠️ Intermarket error: {e}", flush=True)
+        print(f"⚠️ Intermarket agreement error: {e}", flush=True)
         return False
+
 
 
 import numpy as np  # Make sure this is at the top of your file

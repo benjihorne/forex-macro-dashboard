@@ -22,6 +22,7 @@ SMTP_PORT = 587
 LOG_FILE = "trade_log.csv"
 QUANDL_API_KEY = os.getenv("QUANDL_API_KEY", "jmA5k4Z8BwXLW_6hkw-2")
 FRED_API_KEY = os.getenv("FRED_API_KEY", "03041666822ce885ee3462500fa93cd5")
+FMP_API_KEY = "czVnLpLUT3GA7bsOP6yci0eMStqe3hPQ"
 TRADE_PAIRS = [
     ("GBP/USD", "GBP", "USD"),
     ("EUR/USD", "EUR", "USD"),

@@ -37,7 +37,7 @@ TRADE_PAIRS = [
 ]
 
 
-RUN_INTERVAL_SECONDS = 60  # safer scan interval to avoid Render throttling
+RUN_INTERVAL_SECONDS = 21600  # Scan every 6 hours (6 * 60 * 60 seconds) to stay well within free API limits
 
 
 CENTRAL_BANK_TONE = {

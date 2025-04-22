@@ -138,10 +138,6 @@ def fetch_change(symbol, label):
         print(f"⚠️ Intermarket fetch error for {symbol}: {e}", flush=True)
         return None
 
-def get_intermarket_agreement(pair):
-    try:
-        base, quote = pair.split("/")
-        confluences = []
 
 def get_intermarket_agreement(pair):
     try:

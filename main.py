@@ -119,11 +119,12 @@ def get_central_bank_tone(currency):
 def get_intermarket_agreement(pair):
     try:
         td_assets = {
-            "CAD": {"symbol": "CL=F", "name": "Crude Oil"},    # WTI
-            "AUD": {"symbol": "HG=F", "name": "Copper"},       # Copper
-            "CHF": {"symbol": "XAU/USD", "name": "Gold"},      # Gold
-            "JPY": {"symbol": "US10Y", "name": "US 10Y Yield"} # Bonds
-        }
+    "CAD": {"symbol": "WTICOUSD", "name": "Crude Oil"},         # Replaces CL=F
+    "AUD": {"symbol": "COPPER/USD", "name": "Copper"},         # Replaces HG=F
+    "CHF": {"symbol": "XAU/USD", "name": "Gold"},              # Already valid
+    "JPY": {"symbol": "US10Y", "name": "US 10Y Yield"}         # Leave for now, we'll test
+}
+
 
         base, quote = pair.split("/")
 

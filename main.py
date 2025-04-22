@@ -362,7 +362,7 @@ def scan_trade_opportunity(pair, base_ccy, quote_ccy):
     if spread['spread'] > 0 and spread['momentum'] == 'rising':
         checklist.append(f"Yield spread rising in favor: {spread['spread']}bps")
         base_strength += 1
-    cot = get_cot_positioning(base)
+    cot = get_cot_positioning(base_ccy)
     if abs(cot['extreme_zscore']) > 1.5:
         checklist.append(f"COT extreme position: z={cot['extreme_zscore']}")
     sentiment = get_retail_sentiment(pair)

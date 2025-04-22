@@ -240,28 +240,30 @@ def get_technical_pattern(pair):
 def get_upcoming_catalyst(pair):
     try:
         base, quote = pair.split("/")
-        currencies = [base, quote]
+        ccys = [base, quote]
+        fmp_url = f"https://financialmodelingprep.com/api/v3/economic_calendar?apikey={FMP_API_KEY}"
+        res = requests.get(fmp_url).json()
 
-        url = f"https://financialmodelingprep.com/api/v4/economic_calendar?apikey={FMP_API_KEY}"
-        res = requests.get(url).json()
+        now = datetime.datetime.utcnow()
+        upcoming = [x for x in res if "date" in x and datetime.datetime.strptime(x["date"], "%Y-%m-%d") >= now.date()]
 
-        relevant_events = []
-        for event in res:
-            if event["country"] in currencies:
-                impact = event.get("impact", "").lower()
-                if "high" in impact or "medium" in impact:
-                    relevant_events.append(event)
+        catalyst_hits = []
+        for event in upcoming:
+            if "country" not in event or "event" not in event:
+                continue
+            if event["country"] in ccys or any(ccy in event["event"] for ccy in ccys):
+                catalyst_hits.append(event["event"])
 
-        if not relevant_events:
-            print("❌ No aligned catalysts found")
-            return {"event": "none", "bias_alignment": False}
+        if catalyst_hits:
+            print(f"🧭 Upcoming catalysts: {catalyst_hits}", flush=True)
+            return {"event": ", ".join(catalyst_hits[:2]), "bias_alignment": True}
 
-        print(f"✅ Upcoming catalyst(s) found: {len(relevant_events)}")
-        return {"event": relevant_events[0]["event"], "bias_alignment": True}
+        return {"event": "No major events", "bias_alignment": False}
 
     except Exception as e:
-        print(f"⚠️ Catalyst fetch error: {e}")
-        return {"event": "error", "bias_alignment": False}
+        print(f"⚠️ Catalyst fetch error: {e}", flush=True)
+        return {"event": "unknown", "bias_alignment": False}
+
 
 def send_email_alert(pair, checklist, direction):
     confidence = len(checklist)

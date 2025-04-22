@@ -245,7 +245,7 @@ def get_upcoming_catalyst(pair):
         res = requests.get(fmp_url).json()
 
         now = datetime.datetime.utcnow()
-        upcoming = [x for x in res if "date" in x and datetime.datetime.strptime(x["date"], "%Y-%m-%d") >= now.date()]
+        upcoming = [x for x in res if "date" in x and datetime.datetime.strptime(x["date"], "%Y-%m-%d %H:%M:%S") >= now]
 
         catalyst_hits = []
         for event in upcoming:

@@ -251,9 +251,10 @@ def get_technical_pattern(pair):
         ma = recent.rolling(window=10).mean()
 
         if recent.iloc[-1] > ma.iloc[-1] and recent.iloc[-2] < ma.iloc[-2]:
-            return {"key_level_broken": True, "clean_pattern": "bullish breakout"}
+             return {"key_level_broken": True, "clean_pattern": "bullish breakout"}
         elif recent.iloc[-1] < ma.iloc[-1] and recent.iloc[-2] > ma.iloc[-2]:
-            return {"key_level_broken": True, "clean_pattern": "bearish breakdown"}
+             return {"key_level_broken": True, "clean_pattern": "bearish breakdown"}
+
 
         return {"key_level_broken": False, "clean_pattern": "range-bound"}
 

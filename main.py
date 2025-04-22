@@ -143,17 +143,24 @@ def get_intermarket_agreement(pair):
         base, quote = pair.split("/")
         confluences = []
 
-     asset_map = {
-    "CAD": ("CL=F", "Crude Oil"),
-    "AUD": ("HG=F", "Copper"),
-    "CHF": ("GC=F", "Gold"),
-    "JPY": ("GC=F", "Gold"),
-    "USD": ("DX-Y.NYB", "US Dollar Index (DXY)"),
-    "EUR": ("DAX", "German DAX Index"),
-    "GBP": ("UKX.L", "FTSE 100 Index"),
-    "VIX": ("VXX", "VIX Proxy"),
-    "AUD_CHINA": ("SSEC", "Shanghai Composite Index")
-}
+ def get_intermarket_agreement(pair):
+    try:
+        base, quote = pair.split("/")
+        confluences = []
+
+        # === MAPPING ===
+        asset_map = {
+            "CAD": ("CL=F", "Crude Oil"),
+            "AUD": ("HG=F", "Copper"),
+            "CHF": ("GC=F", "Gold"),
+            "JPY": ("GC=F", "Gold"),
+            "USD": ("DX-Y.NYB", "US Dollar Index (DXY)"),
+            "EUR": ("DAX", "German DAX Index"),
+            "GBP": ("UKX.L", "FTSE 100 Index"),
+            "VIX": ("VXX", "VIX Proxy"),
+            "AUD_CHINA": ("SSEC", "Shanghai Composite Index")
+        }
+
 
 
         for side in [base, quote]:

@@ -122,11 +122,11 @@ FMP_API_KEY = "czVnLpLUT3GA7bsOP6yci0eMStqe3hPQ"
 def get_intermarket_agreement(pair, cached_assets={}):
     try:
         fmp_assets = {
-            "CAD": {"symbol": "WTI_OIL", "name": "Crude Oil"},
-            "AUD": {"symbol": "COPPER", "name": "Copper"},
-            "CHF": {"symbol": "GOLD", "name": "Gold"},
-            "JPY": {"symbol": "US10Y", "name": "10Y Treasury"}
-        }
+    "CAD": {"symbol": "CL", "name": "Crude Oil"},          # Crude
+    "AUD": {"symbol": "HG", "name": "Copper"},             # Copper
+    "CHF": {"symbol": "GC", "name": "Gold"},               # Gold
+    "JPY": {"symbol": "^TNX", "name": "10Y Treasury Yield"}# Bonds (via index)
+}
 
         base, quote = pair.split("/")
 

@@ -122,32 +122,44 @@ def get_intermarket_agreement(pair):
             "CAD": {"symbol": "CL=F", "name": "Crude Oil"},    # WTI
             "AUD": {"symbol": "HG=F", "name": "Copper"},       # Copper
             "CHF": {"symbol": "XAU/USD", "name": "Gold"},      # Gold
-            "JPY": {"symbol": "US10Y", "name": "US 10Y Yield"} # US10Y
+            "JPY": {"symbol": "US10Y", "name": "US 10Y Yield"} # Bonds
         }
 
-        base = pair.split("/")[0]
-        quote = pair.split("/")[1]
+        base, quote = pair.split("/")
 
-        driver = td_assets.get(base)
-        if not driver:
-            print(f"❌ No intermarket logic for {base}", flush=True)
-            return False  # No intermarket logic for this base currency
+        confluences = []
 
-        symbol = driver["symbol"]
+        for side in [base, quote]:
+            driver = td_assets.get(side)
+            if not driver:
+                print(f"❌ No intermarket logic for {side}", flush=True)
+                continue
 
-        print(f"🟡 Checking intermarket driver for {base}: {symbol}", flush=True)
+            symbol = driver["symbol"]
+            print(f"🟡 Checking intermarket driver for {side}: {symbol}", flush=True)
 
-        url = f"https://api.twelvedata.com/quote?symbol={symbol}&apikey=7e69098ce083444684fb4d5d601598b8"
-        res = requests.get(url).json()
+            url = f"https://api.twelvedata.com/quote?symbol={symbol}&apikey=7e69098ce083444684fb4d5d601598b8"
+            res = requests.get(url).json()
 
-        if "percent_change" not in res:
-            print(f"⚠️ Intermarket data not available for {symbol}", flush=True)
+            if "percent_change" not in res:
+                print(f"⚠️ Intermarket data not available for {symbol}", flush=True)
+                continue
+
+            percent = float(res["percent_change"])
+            print(f"🔢 {driver['name']} change: {percent:.2f}% for {side}", flush=True)
+
+            # Simple logic: positive move = strength bias
+            if side == base and percent > 0.5:
+                confluences.append(f"{side} supported by {driver['name']}")
+            elif side == quote and percent < -0.5:
+                confluences.append(f"{side} weakness from {driver['name']}")
+
+        if confluences:
+            print(f"✅ Intermarket agreement confirmed: {' & '.join(confluences)}", flush=True)
+            return True
+        else:
+            print("❌ No intermarket alignment confirmed", flush=True)
             return False
-
-        percent = float(res["percent_change"])
-        print(f"🔢 Live % change from API: {percent:.2f}% for {base}", flush=True)
-
-        return percent > 0.5
 
     except Exception as e:
         print(f"⚠️ Intermarket agreement error: {e}", flush=True)

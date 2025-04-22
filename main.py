@@ -53,27 +53,39 @@ CENTRAL_BANK_TONE = {
 
 
 # --- DATA FUNCTIONS ---
-def get_cot_data(currency):
-    code_map = {
-        "EUR": "CHRIS/CME_EC1",
-        "GBP": "CHRIS/CME_BP1",
-        "JPY": "CHRIS/CME_JY1",
-        "AUD": "CHRIS/CME_AD1",
-        "CAD": "CHRIS/CME_CD1",
-        "CHF": "CHRIS/CME_SF1",
-        "NZD": "CHRIS/CME_NE1"
-    }
+def get_cot_positioning(currency):
     try:
+        code_map = {
+            "USD": None,
+            "EUR": "CFTC/EU_F_L_ALL",
+            "GBP": "CFTC/PO_F_L_ALL",
+            "JPY": "CFTC/JY_F_L_ALL",
+            "AUD": "CFTC/AU_F_L_ALL",
+            "CAD": "CFTC/CD_F_L_ALL",
+            "CHF": "CFTC/SF_F_L_ALL",
+            "NZD": "CFTC/NE_F_L_ALL"
+        }
         code = code_map.get(currency.upper())
         if not code:
-            print(f"❌ No COT code for {currency}")
             return {"net_spec_position": 0, "extreme_zscore": 0.0}
+        
         url = f"https://data.nasdaq.com/api/v3/datasets/{code}.json?api_key={QUANDL_API_KEY}"
-response = requests.get(url)
-if response.status_code != 200:
-    raise Exception(f"Nasdaq API error: {response.status_code} - {response.text}")
-data = response.json()["dataset"]["data"]
-df = pd.DataFrame(data, columns=response.json()["dataset"]["column_names"])
+        response = requests.get(url)
+        if response.status_code != 200:
+            print(f"⚠️ COT fetch failed ({currency}): {response.status_code}")
+            return {"net_spec_position": 0, "extreme_zscore": 0.0}
+        
+        data = response.json()["dataset"]["data"]
+        df = pd.DataFrame(data, columns=response.json()["dataset"]["column_names"])
+        spec_net = df["Net Position"] if "Net Position" in df.columns else df.iloc[:, -1]
+        zscore = (spec_net.iloc[0] - spec_net.mean()) / spec_net.std()
+        return {
+            "net_spec_position": spec_net.iloc[0],
+            "extreme_zscore": round(zscore, 2)
+        }
+    except Exception as e:
+        print(f"⚠️ COT data fetch error for {currency}: {e}")
+        return {"net_spec_position": 0, "extreme_zscore": 0.0}
 
 
 

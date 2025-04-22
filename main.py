@@ -222,28 +222,40 @@ def get_intermarket_agreement(pair):
 
 import numpy as np  # Make sure this is at the top of your file
 
+# --- LIVE TECHNICAL PATTERN DETECTION ---
 def get_technical_pattern(pair):
     try:
-        fmp_pair = pair.replace("/", "")
-        url = f"https://financialmodelingprep.com/api/v3/historical-chart/1hour/{fmp_pair}?apikey={FMP_API_KEY}"
+        base, quote = pair.split("/")
+        symbol = f"{base}{quote}=X"
+        url = f"https://financialmodelingprep.com/api/v3/historical-chart/5min/{symbol}?apikey={FMP_API_KEY}"
         res = requests.get(url).json()
-        if not isinstance(res, list) or len(res) < 10:
-            return {"key_level_broken": False, "clean_pattern": None}
 
-        closes = [float(candle["close"]) for candle in res[:10]]
-        current = closes[0]
-        recent_high = max(closes[1:])
-        recent_low = min(closes[1:])
+        if not isinstance(res, list):
+            print(f"⚠️ Technical pattern fetch failed for {pair}: {res}", flush=True)
+            return {"key_level_broken": False, "clean_pattern": "invalid response"}
 
-        if current > recent_high:
+        df = pd.DataFrame(res)
+        df["datetime"] = pd.to_datetime(df["date"])
+        df.set_index("datetime", inplace=True)
+        closes = df["close"].sort_index()
+
+        if len(closes) < 30:
+            return {"key_level_broken": False, "clean_pattern": "not enough data"}
+
+        recent = closes[-20:]
+        ma = recent.rolling(window=10).mean()
+
+        if recent[-1] > ma[-1] and recent[-2] < ma[-2]:
             return {"key_level_broken": True, "clean_pattern": "bullish breakout"}
-        elif current < recent_low:
+        elif recent[-1] < ma[-1] and recent[-2] > ma[-2]:
             return {"key_level_broken": True, "clean_pattern": "bearish breakdown"}
-        else:
-            return {"key_level_broken": False, "clean_pattern": "range"}
+
+        return {"key_level_broken": False, "clean_pattern": "range-bound"}
+
     except Exception as e:
-        print(f"⚠️ Technical pattern fetch error: {e}")
-        return {"key_level_broken": False, "clean_pattern": None}
+        print(f"⚠️ Technical pattern detection error: {e}", flush=True)
+        return {"key_level_broken": False, "clean_pattern": "error"}
+
 
 def get_upcoming_catalyst(pair):
     try:

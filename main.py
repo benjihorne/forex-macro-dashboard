@@ -121,86 +121,63 @@ FMP_API_KEY = "czVnLpLUT3GA7bsOP6yci0eMStqe3hPQ"
 
 def get_intermarket_agreement(pair, cached_assets={}):
     try:
+        # Asset map by currency or general macro sentiment
         fmp_assets = {
-    "CAD": {"symbol": "CL", "name": "Crude Oil"},          # Crude
-    "AUD": {"symbol": "HG", "name": "Copper"},             # Copper
-    "CHF": {"symbol": "GC", "name": "Gold"},               # Gold
-    "JPY": {"symbol": "^TNX", "name": "10Y Treasury Yield"}# Bonds (via index)
-}
+            "CAD": {"symbol": "CL", "name": "Crude Oil"},
+            "AUD": {"symbol": "HG", "name": "Copper"},
+            "CHF": {"symbol": "GC", "name": "Gold"},
+            "JPY": {"symbol": "GC", "name": "Gold"},
+            "JPY_VIX": {"symbol": "^VIX", "name": "VIX Index"},
+            "CHF_VIX": {"symbol": "^VIX", "name": "VIX Index"},
+            "AUD_CHINA": {"symbol": "000001.SS", "name": "Shanghai Composite Index"}
+        }
 
         base, quote = pair.split("/")
-
         confluences = []
 
-        for side in [base, quote]:
-            asset = fmp_assets.get(side)
-            if not asset:
-                print(f"❌ No intermarket logic for {side}", flush=True)
-                continue
-
-            symbol = asset["symbol"]
-            name = asset["name"]
-
+        # Function to fetch and cache asset percent changes
+        def fetch_change(symbol, label):
             if symbol in cached_assets:
-                data = cached_assets[symbol]
-            else:
-                url = f"https://financialmodelingprep.com/api/v3/quote/{symbol}?apikey={FMP_API_KEY}"
-                res = requests.get(url).json()
-                if not res or "changesPercentage" not in res[0]:
-                    print(f"⚠️ Intermarket data not available for {symbol}", flush=True)
-                    continue
-                data = res[0]
-                cached_assets[symbol] = data  # Save it for reuse
-
-            percent = float(data["changesPercentage"])
-            print(f"🔢 {name} change: {percent:.2f}% for {side}", flush=True)
-
-            if side == base and percent > 0.5:
-                confluences.append(f"{side} supported by {name}")
-            elif side == quote and percent < -0.5:
-                confluences.append(f"{side} weakness from {name}")
-
-        if confluences:
-            print(f"✅ Intermarket agreement confirmed: {' & '.join(confluences)}", flush=True)
-            return True
-        else:
-            print("❌ No intermarket alignment confirmed", flush=True)
-            return False
-
-    except Exception as e:
-        print(f"⚠️ Intermarket agreement error: {e}", flush=True)
-        return False
-
-
-
-        base, quote = pair.split("/")
-
-        confluences = []
-
-        for side in [base, quote]:
-            driver = td_assets.get(side)
-            if not driver:
-                print(f"❌ No intermarket logic for {side}", flush=True)
-                continue
-
-            symbol = driver["symbol"]
-            print(f"🟡 Checking intermarket driver for {side}: {symbol}", flush=True)
-
-            url = f"https://api.twelvedata.com/quote?symbol={symbol}&apikey=7e69098ce083444684fb4d5d601598b8"
+                return cached_assets[symbol]
+            url = f"https://financialmodelingprep.com/api/v3/quote/{symbol}?apikey={FMP_API_KEY}"
             res = requests.get(url).json()
-
-            if "percent_change" not in res:
+            if not res or "changesPercentage" not in res[0]:
                 print(f"⚠️ Intermarket data not available for {symbol}", flush=True)
-                continue
+                return None
+            change = float(res[0]["changesPercentage"])
+            cached_assets[symbol] = change
+            print(f"🔢 {label} change: {change:.2f}%", flush=True)
+            return change
 
-            percent = float(res["percent_change"])
-            print(f"🔢 {driver['name']} change: {percent:.2f}% for {side}", flush=True)
+        # Base/Quote specific logic
+        for side in [base, quote]:
+            if side in fmp_assets:
+                asset = fmp_assets[side]
+                change = fetch_change(asset["symbol"], asset["name"])
+                if change is not None:
+                    if side == base and change > 0.5:
+                        confluences.append(f"{side} supported by {asset['name']}")
+                    elif side == quote and change < -0.5:
+                        confluences.append(f"{side} weakness from {asset['name']}")
+            else:
+                print(f"❌ No intermarket logic for {side}", flush=True)
 
-            # Simple logic: positive move = strength bias
-            if side == base and percent > 0.5:
-                confluences.append(f"{side} supported by {driver['name']}")
-            elif side == quote and percent < -0.5:
-                confluences.append(f"{side} weakness from {driver['name']}")
+        # VIX: If VIX ↑ → JPY/CHF strength
+        if base in ["JPY", "CHF"]:
+            vix_change = fetch_change("^VIX", "VIX")
+            if vix_change is not None and vix_change > 2:
+                confluences.append(f"{base} supported by risk-off (VIX ↑)")
+
+        if quote in ["JPY", "CHF"]:
+            vix_change = fetch_change("^VIX", "VIX")
+            if vix_change is not None and vix_change > 2:
+                confluences.append(f"{quote} weakness from risk-off (VIX ↑)")
+
+        # Shanghai for AUD strength
+        if base == "AUD":
+            china_change = fetch_change("000001.SS", "Shanghai Index")
+            if china_change is not None and china_change > 0.5:
+                confluences.append("AUD strength from China optimism")
 
         if confluences:
             print(f"✅ Intermarket agreement confirmed: {' & '.join(confluences)}", flush=True)

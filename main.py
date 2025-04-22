@@ -123,26 +123,29 @@ def get_intermarket_agreement(pair):
 
         driver = td_assets.get(base)
         if not driver:
+            print(f"❌ No intermarket logic for {base}", flush=True)
             return False  # No intermarket logic for this base currency
 
         symbol = driver["symbol"]
+
+        print(f"🟡 Checking intermarket driver for {base}: {symbol}", flush=True)
 
         url = f"https://api.twelvedata.com/quote?symbol={symbol}&apikey=7e69098ce083444684fb4d5d601598b8"
         res = requests.get(url).json()
 
         if "percent_change" not in res:
-            print(f"⚠️ Intermarket data not available for {symbol}")
+            print(f"⚠️ Intermarket data not available for {symbol}", flush=True)
             return False
 
         percent = float(res["percent_change"])
-        print(f"🔗 {driver['name']} change: {percent:.2f}% for {base}", flush=True)
+        print(f"🔢 Live % change from API: {percent:.2f}% for {base}", flush=True)
 
-        # Confirmation logic: intermarket asset must be rising
         return percent > 0.5
 
     except Exception as e:
         print(f"⚠️ Intermarket agreement error: {e}", flush=True)
         return False
+
 
 
 

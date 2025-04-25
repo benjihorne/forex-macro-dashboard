@@ -389,17 +389,33 @@ def scan_trade_opportunity(pair, base_ccy, quote_ccy):
         print("❌ Not enough edge for swing entry")
 
 def auto_run_dashboard():
-    print("🚀 __main__ reached — beginning bot loop", flush=True)
+    print("🚀 __main__ reached — scheduled scan mode active", flush=True)
+    scanned_today = set()
+
     while True:
-        print("🌀 Loop tick...", flush=True)  # <-- ADD THIS
-        print(f"\n[SCAN START] {datetime.datetime.utcnow()} UTC", flush=True)
-        for pair, base, quote in TRADE_PAIRS:
-            try:
-                scan_trade_opportunity(pair, base, quote)
-            except Exception as e:
-                print(f"⚠️ Error during scan: {e}", flush=True)
-            print("---------------------------------------", flush=True)
-        time.sleep(RUN_INTERVAL_SECONDS)
+        now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=10)))  # AEST (UTC+10)
+        current_time = now.strftime("%H:%M")
+
+        # Reset set at midnight
+        if current_time == "00:00":
+            scanned_today.clear()
+
+        # Scan only at 06:00 and 18:00 local time
+        if current_time in ["06:00", "18:00"] and current_time not in scanned_today:
+            print(f"\n🕕 Running scheduled scan at {current_time} AEST", flush=True)
+            print(f"[SCAN START] {datetime.datetime.utcnow()} UTC", flush=True)
+
+            for pair, base, quote in TRADE_PAIRS:
+                try:
+                    scan_trade_opportunity(pair, base, quote)
+                except Exception as e:
+                    print(f"⚠️ Error during scan: {e}", flush=True)
+                print("---------------------------------------", flush=True)
+
+            scanned_today.add(current_time)
+
+        time.sleep(60)
+
 
 if __name__ == "__main__":
     auto_run_dashboard()

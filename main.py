@@ -26,15 +26,13 @@ FMP_API_KEY = "czVnLpLUT3GA7bsOP6yci0eMStqe3hPQ"
 
 TRADE_PAIRS = [
     ("GBP/USD", "GBP", "USD"),
-    ("EUR/USD", "EUR", "USD"),
     ("USD/JPY", "USD", "JPY"),
     ("USD/CAD", "USD", "CAD"),
     ("AUD/USD", "AUD", "USD"),
-    ("NZD/USD", "NZD", "USD"),
-    ("USD/CHF", "USD", "CHF"),
-    ("EUR/GBP", "EUR", "GBP"),
-    ("GBP/JPY", "GBP", "JPY")
+    ("GBP/JPY", "GBP", "JPY"),
+    ("EUR/USD", "EUR", "USD"),  # Optional: Keep if you want one slower, bigger liquidity pair
 ]
+
 
 
 RUN_INTERVAL_SECONDS = 21600  # Scan every 6 hours (6 * 60 * 60 seconds) to stay well within free API limits

@@ -427,41 +427,39 @@ def get_upcoming_catalyst(pair):
 
 
 
-def send_email_alert(pair, checklist, direction):
-    confidence = len(checklist)
-    print(f"[DEBUG] Attempting to send email: {pair}, confluences: {confidence}")
-    if confidence < 4:
-        print(f"❌ Email BLOCKED — only {confidence}/7 confluences for {pair}")
+# ───────────────── EMAIL & JOURNAL WITH WEIGHTED SCORE ─────────────
+def send_email_alert(pair, checklist, direction, score):
+    """Send bias alert only when weighted score >= SCORE_THRESHOLD."""
+    if score < SCORE_THRESHOLD:
+        print(f"❌ Email BLOCKED — score {score:.1f} / {SCORE_THRESHOLD}")
         return
+
     msg = MIMEMultipart("alternative")
-    msg["Subject"] = f"[{direction.upper()}] {pair} Trade Signal — {confidence}/7 Confluences"
-    msg["From"] = EMAIL_SENDER
-    msg["To"] = EMAIL_RECEIVER
+    msg["Subject"] = f"[{direction.upper()}] {pair} — {score:.1f}-pt bias"
+    msg["From"]    = EMAIL_SENDER
+    msg["To"]      = EMAIL_RECEIVER
+
     html = f"""
-    <html>
-        <body style='font-family: Arial, sans-serif;'>
-            <div style='max-width:600px;margin:auto;'>
-                <h2 style='color:#1e90ff;'>📈 Trade Setup Triggered: {pair}</h2>
-                <p><strong>📍 Direction:</strong> <span style='color:{'green' if direction == 'long' else 'red'};'>{direction.upper()}</span></p>
-                <p><strong>✅ Confidence:</strong> {confidence}/7 confluences</p>
-                <ul>{''.join(f'<li>✔️ {item}</li>' for item in checklist)}</ul>
-                <p style='font-size: 12px; color: #888;'>UTC: {datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')}</p>
-            </div>
-        </body>
-    </html>
+    <html><body style='font-family:Arial'>
+        <h2>📈 {pair} bias triggered</h2>
+        <p><b>Direction:</b> {'LONG' if direction=='long' else 'SHORT'}</p>
+        <p><b>Weighted score:</b> {score:.1f} / {SCORE_THRESHOLD}</p>
+        <ul>{''.join(f'<li>{item}</li>' for item in checklist)}</ul>
+        <p style='font-size:12px;color:#888'>UTC: {datetime.datetime.utcnow():%Y-%m-%d %H:%M:%S}</p>
+    </body></html>
     """
     msg.attach(MIMEText(html, "html"))
     with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
         server.starttls()
-        server.login(EMAIL_SENDER, EMAIL_PASSWORD)
+        server.login(EMAIL_SENDER, EMAIL_PASS)
         server.sendmail(EMAIL_SENDER, EMAIL_RECEIVER, msg.as_string())
 
-def log_trade(pair, checklist):
+def log_trade(pair, checklist, score):
     df = pd.DataFrame([{
         "timestamp": datetime.datetime.utcnow(),
         "pair": pair,
-        "checklist": ", ".join(checklist),
-        "confluences": len(checklist)
+        "checklist": " | ".join(checklist),
+        "score": score
     }])
     try:
         existing = pd.read_csv(LOG_FILE)
@@ -469,6 +467,7 @@ def log_trade(pair, checklist):
     except FileNotFoundError:
         pass
     df.to_csv(LOG_FILE, index=False)
+# ───────────────────────────────────────────────────────────────────
 
 def precision_filters(pair, base_ccy, quote_ccy, direction):
     now_utc = datetime.datetime.utcnow()
@@ -708,8 +707,8 @@ def scan_trade_opportunity(pair, base_ccy, quote_ccy):
 
     if score >= SCORE_THRESHOLD:
         print(f"✅ TRADE VALIDATED ({score:.1f} pts, {direction.upper()} {pair})")
-        send_email_alert(pair, checklist, direction)
-        log_trade(pair, checklist + [f"SCORE={score:.1f}"])
+        send_email_alert(pair, checklist, direction, score)
+        log_trade(pair, checklist, score)
     else:
         print(f"❌ Not enough score ({score:.1f} / {SCORE_THRESHOLD})")
 

@@ -251,7 +251,7 @@ def get_technical_pattern(pair):
     try:
         base, quote = pair.split("/")
         symbol = f"{base}{quote}=X"
-        url = f"https://financialmodelingprep.com/api/v3/historical-chart/5min/{symbol}?apikey={FMP_API_KEY}"
+        url = f"https://financialmodelingprep.com/api/v3/historical-chart/4hour/{symbol}?apikey={FMP_API_KEY}"
         res = requests.get(url).json()
         df = pd.DataFrame(res)
 

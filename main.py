@@ -493,7 +493,7 @@ def is_volatility_sufficient(pair):
 def is_in_killzone():
     now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=10)))  # AEST timezone
     current_hour = now.hour
-        return 17 <= current_hour <= 22  # 17 = 5PM, 22 = 10PM
+    return 17 <= current_hour <= 22  # 17 = 5PM, 22 = 10PM
 
 
 def scan_trade_opportunity(pair, base_ccy, quote_ccy):

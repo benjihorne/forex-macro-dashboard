@@ -448,9 +448,53 @@ def precision_filters(pair, base_ccy, quote_ccy, direction):
     return True
 
 
+def is_volatility_sufficient(pair):
+    try:
+        base, quote = pair.split("/")
+        symbol = f"{base}{quote}=X"
+
+        url = f"https://financialmodelingprep.com/api/v3/historical-chart/4hour/{symbol}?apikey={FMP_API_KEY}"
+        res = requests.get(url)
+        if res.status_code != 200:
+            print(f"⚠️ ATR fetch error for {pair}")
+            return True  # Fail safe: assume volatility is fine
+
+        df = pd.DataFrame(res.json())
+        if df.empty or "close" not in df.columns:
+            return True  # Fail safe: assume volatility fine
+
+        df["datetime"] = pd.to_datetime(df["date"])
+        df.set_index("datetime", inplace=True)
+        closes = df["close"].sort_index()
+
+        # Calculate ATR(14) manually on 4H data
+        df["H-L"] = df["high"] - df["low"]
+        df["H-PC"] = abs(df["high"] - df["close"].shift(1))
+        df["L-PC"] = abs(df["low"] - df["close"].shift(1))
+        df["TR"] = df[["H-L", "H-PC", "L-PC"]].max(axis=1)
+        df["ATR"] = df["TR"].rolling(window=14).mean()
+
+        latest_atr = df["ATR"].iloc[-1]
+        latest_close = closes.iloc[-1]
+
+        atr_percent = (latest_atr / latest_close) * 100
+
+        # Minimum acceptable volatility (adjust if needed)
+        if atr_percent >= 0.3:
+            return True
+        else:
+            print(f"⚠️ Skipping {pair} — 4H volatility too low ({atr_percent:.2f}%)")
+            return False
+
+    except Exception as e:
+        print(f"⚠️ Error in 4H volatility check for {pair}: {e}")
+        return True  # Fail safe: assume volatility is fine if error
+
 
 
 def scan_trade_opportunity(pair, base_ccy, quote_ccy):
+    if not is_volatility_sufficient(pair):
+        return
     checklist = []
     base_strength = 0
     quote_strength = 0
@@ -497,6 +541,7 @@ def scan_trade_opportunity(pair, base_ccy, quote_ccy):
         log_trade(pair, checklist)
     else:
         print("❌ Not enough edge for swing entry")
+
 
 
 

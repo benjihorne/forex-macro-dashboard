@@ -489,16 +489,13 @@ def scan_trade_opportunity(pair, base_ccy, quote_ccy):
 
     direction = "long" if base_strength >= quote_strength else "short"
 
-    # Precision filters
-    if not precision_filters(pair, base_ccy, quote_ccy, direction):
-        return
-
     if len(checklist) >= 2:
         print(f"✅ TRADE VALIDATED ({len(checklist)}/7, {direction.upper()} {pair})")
         send_email_alert(pair, checklist, direction)
         log_trade(pair, checklist)
     else:
         print("❌ Not enough edge for swing entry")
+
 
 
 def auto_run_dashboard():

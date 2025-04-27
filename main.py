@@ -12,19 +12,29 @@ import os
 import sys
 import numpy as np  # Already in your code, but make sure it's there
 
+from dotenv import load_dotenv
+load_dotenv()          # <- pulls variables from .env
 
 print(f"🛠 Running Python version: {sys.version}", flush=True)
 
-# --- CONFIG ---
-EMAIL_SENDER = os.getenv("EMAIL_SENDER", "benjihornetrades@gmail.com")
-EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD", "Ben135790!")
+# --- CONFIG (pulled from .env) ---------------------------------
+from dotenv import load_dotenv
+load_dotenv()                       # ← keep this near the imports
+
+EMAIL_SENDER   = os.getenv("EMAIL_SENDER", "benjihornetrades@gmail.com")
+EMAIL_PASS     = os.getenv("EMAIL_PASS")           # Gmail app-password
 EMAIL_RECEIVER = os.getenv("EMAIL_RECEIVER", "benhorne6@gmail.com")
+
 SMTP_SERVER = "smtp.gmail.com"
-SMTP_PORT = 587
+SMTP_PORT   = 587
+
 LOG_FILE = "trade_log.csv"
-QUANDL_API_KEY = os.getenv("QUANDL_API_KEY", "5aMXd383niMqhxwRic-2")  # ✅ New Nasdaq API Key
-FRED_API_KEY = os.getenv("FRED_API_KEY", "03041666822ce885ee3462500fa93cd5")
-FMP_API_KEY = "czVnLpLUT3GA7bsOP6yci0eMStqe3hPQ"
+
+TE_KEY         = os.getenv("TE_KEY")               # TradingEconomics
+FMP_API_KEY    = os.getenv("FMP_API_KEY")
+FRED_API_KEY   = os.getenv("FRED_API_KEY")
+QUANDL_API_KEY = os.getenv("QUANDL_API_KEY")       # safe to keep even if unused
+
 
 TRADE_PAIRS = [
     ("GBP/USD", "GBP", "USD"),
@@ -39,17 +49,6 @@ TRADE_PAIRS = [
 
 RUN_INTERVAL_SECONDS = 21600  # Scan every 6 hours (6 * 60 * 60 seconds) to stay well within free API limits
 
-
-CENTRAL_BANK_TONE = {
-    "USD": "hawkish",
-    "EUR": "neutral",
-    "GBP": "hawkish",
-    "JPY": "dovish",
-    "AUD": "neutral",
-    "CAD": "hawkish",
-    "CHF": "neutral",
-    "NZD": "neutral"
-}
 
 
 # --- DATA FUNCTIONS ---
@@ -101,28 +100,130 @@ def get_cot_positioning(currency):
 
 
 
-def get_yield_spread(ccy1, ccy2):
-    fred_series = {
-        ("USD", "EUR"): ("DGS10", "IRLTLT01EZM156N"),
-        ("USD", "GBP"): ("DGS10", "IRLTLT01GBM156N"),
-        ("USD", "JPY"): ("DGS10", "IRLTLT01JPM156N"),
-    }
-    try:
-        series_us, series_foreign = fred_series.get((ccy1, ccy2), (None, None))
-        if not series_us or not series_foreign:
-            return {"spread": 0.0, "momentum": "neutral"}
-        url_us = f"https://api.stlouisfed.org/fred/series/observations?series_id={series_us}&api_key={FRED_API_KEY}&file_type=json&sort_order=desc&limit=2"
-        url_foreign = f"https://api.stlouisfed.org/fred/series/observations?series_id={series_foreign}&api_key={FRED_API_KEY}&file_type=json&sort_order=desc&limit=2"
-        data_us = requests.get(url_us).json()["observations"]
-        data_foreign = requests.get(url_foreign).json()["observations"]
-        us_now, us_prev = float(data_us[0]["value"]), float(data_us[1]["value"])
-        f_now, f_prev = float(data_foreign[0]["value"]), float(data_foreign[1]["value"])
-        spread_now = us_now - f_now
-        spread_prev = us_prev - f_prev
-        momentum = "rising" if spread_now > spread_prev else "falling" if spread_now < spread_prev else "neutral"
-        return {"spread": round(spread_now, 2), "momentum": momentum}
-    except:
-        return {"spread": 0.0, "momentum": "neutral"}
+# ----- LIVE 10-year cross-country spread (TradingEconomics) -----
+import httpx, asyncio, os
+
+TE_KEY = os.getenv("TE_KEY", "guest:guest")
+
+BONDS = {  # G-10 10-year symbols
+    "USD": "us10y",
+    "GBP": "gb10y",
+    "EUR": "germany10y",
+    "JPY": "jp10y",
+    "AUD": "au10y",
+    "CAD": "ca10y",
+}
+
+async def _bond(code):
+    url = f"https://api.tradingeconomics.com/bonds/{code}?c={TE_KEY}&f=json"
+    async with httpx.AsyncClient(timeout=6) as c:
+        r = await c.get(url)
+        r.raise_for_status()
+    return float(r.json()[0]["value"])
+
+# ---- robust 10-year cross-country spread ----------------------
+import httpx, asyncio, os, datetime, json, time
+
+TE_KEY      = os.getenv("TE_KEY", "guest:guest")
+FMP_API_KEY = os.getenv("FMP_API_KEY")
+
+# TradingEconomics tickers for 10-year gov bonds
+TE_TICKER = {
+    "GBP": "unitedkingdomgovernmentbond10y",
+    "EUR": "germanygovernmentbondbund10y",
+    "JPY": "japangovernmentbond10y",
+    "AUD": "australiagovernmentbond10y",
+    "CAD": "canadagovernmentbond10y",
+}
+
+async def te_yield(ccy):
+    code = TE_TICKER[ccy]
+    url  = f"https://api.tradingeconomics.com/bonds/{code}?c={TE_KEY}&f=json"
+    async with httpx.AsyncClient(timeout=6) as c:
+        r = await c.get(url)
+        r.raise_for_status()
+    return float(r.json()[0]["value"])
+
+async def us_yield():
+    url = f"https://financialmodelingprep.com/api/v4/treasury?maturity=10Y&apikey={FMP_API_KEY}"
+    async with httpx.AsyncClient(timeout=6) as c:
+        r = await c.get(url)
+        r.raise_for_status()
+    return float(r.json()[0]["year10"])
+
+# -------- robust cross-country 10-year spread (USD live, others EoD) -----
+import httpx, asyncio, os, datetime, json
+
+FMP_API_KEY  = os.getenv("FMP_API_KEY")
+FRED_API_KEY = os.getenv("FRED_API_KEY")
+
+FRED_SERIES_10Y = {
+    "GBP": "IRLTLT01GBM156N",   # UK 10-yr constant-maturity
+    "EUR": "IRLTLT01EZM156N",   # Euro area
+    "JPY": "IRLTLT01JPM156N",   # Japan
+    "AUD": "IRLTLT01AUM156N",   # Australia
+    "CAD": "IRLTLT01CAM156N",   # Canada
+}
+
+async def us_10y():
+    url = f"https://financialmodelingprep.com/api/v4/treasury?maturity=10Y&apikey={FMP_API_KEY}"
+    async with httpx.AsyncClient(timeout=6) as c:
+        r = await c.get(url); r.raise_for_status()
+    return float(r.json()[0]["year10"])
+
+async def fred_10y(series):
+    url = (
+        "https://api.stlouisfed.org/fred/series/observations"
+        f"?series_id={series}&api_key={FRED_API_KEY}&file_type=json&sort_order=desc&limit=1"
+    )
+    async with httpx.AsyncClient(timeout=6) as c:
+        r = await c.get(url); r.raise_for_status()
+    return float(r.json()["observations"][0]["value"])
+
+def get_yield_spread(base, quote):
+    async def _spread():
+        y_base  = await (us_10y() if base  == "USD" else fred_10y(FRED_SERIES_10Y[base]))
+        y_quote = await (us_10y() if quote == "USD" else fred_10y(FRED_SERIES_10Y[quote]))
+        diff = round(y_base - y_quote, 2)
+        return {
+            "cross_10": diff,                    # + => base yield higher
+            "momentum": "widening" if diff > 0 else "narrowing"
+        }
+    return asyncio.run(_spread())
+
+# ---- live CB tone via RSS headlines ---------------------------
+import feedparser, datetime
+
+RSS_FEEDS = {
+    "USD": ["https://www.federalreserve.gov/feeds/press_all.xml"],
+    "GBP": ["https://www.bankofengland.co.uk/boeapps/RSSFeeds/Pages/News.xml"],
+    "EUR": ["https://www.ecb.europa.eu/rss/press.html"],
+    "JPY": ["https://www.boj.or.jp/en/announcements/release_2024.xml"],
+    "AUD": ["https://www.rba.gov.au/rss/media-releases.xml"],
+    "CAD": ["https://www.bankofcanada.ca/feeds/speeches"],
+}
+
+HAWKISH = ("hike", "tighten", "restrictive", "inflation too high")
+DOVISH  = ("cut", "ease", "accommodative", "downside risk")
+
+def get_central_bank_tone(ccy):
+    texts = []
+    today = datetime.datetime.utcnow().date()
+    for url in RSS_FEEDS.get(ccy, []):
+        for entry in feedparser.parse(url).entries[:5]:
+            ts = datetime.datetime(*entry.published_parsed[:6]).date()
+            if ts == today:
+                texts.append((entry.title + " " + entry.summary).lower())
+
+    blob = " ".join(texts)
+    if any(k in blob for k in HAWKISH):
+        return {"tone": "hawkish"}
+    if any(k in blob for k in DOVISH):
+        return {"tone": "dovish"}
+    return {"tone": "neutral"}
+# ----------------------------------------------------------------
+
+# ------------------------------------------------------------------------
 
 def get_retail_sentiment(pair):
     url = "https://www.ig.com/au/trading-strategies/client-sentiment"
@@ -144,12 +245,7 @@ def get_retail_sentiment(pair):
     except:
         return {"long_percent": 50, "retail_against": False}
 
-def get_central_bank_tone(currency):
-    tone = CENTRAL_BANK_TONE.get(currency.upper(), "neutral")
-    recent_surprise = tone in ["hawkish", "dovish"]
-    return {"tone": tone, "recent_surprise": recent_surprise}
 
-FMP_API_KEY = "czVnLpLUT3GA7bsOP6yci0eMStqe3hPQ"
 
 cached_assets = {}
 
@@ -497,53 +593,69 @@ def is_in_killzone():
 
 
 def scan_trade_opportunity(pair, base_ccy, quote_ccy):
+    # ── hard filters ─────────────────────────────────────────────
     if not is_in_killzone():
-        print(f"⚠️ Skipping {pair} — outside kill zone hours (5PM–10PM AEST)")
+        print(f"⚠️ Skipping {pair} — outside kill zone hours (5 PM–10 PM AEST)")
         return
 
     if not is_volatility_sufficient(pair):
         return
 
-    checklist = []
-    base_strength = 0
+    # ── initialise checklist ────────────────────────────────────
+    checklist      = []
+    base_strength  = 0
     quote_strength = 0
 
-    # (Then your macro + technical scanning continues as normal...)
-
-    tone = get_central_bank_tone(base_ccy)
-    if tone['tone'] == 'hawkish':
-        checklist.append("Macro favors base currency")
+    # ── CENTRAL-BANK TONE ───────────────────────────────────────
+    tone_base  = get_central_bank_tone(base_ccy)["tone"]
+    tone_quote = get_central_bank_tone(quote_ccy)["tone"]
+    if tone_base == "hawkish" and tone_quote == "dovish":
+        checklist.append("CB tone divergence hawk→dove")
         base_strength += 1
+    elif tone_base == "dovish" and tone_quote == "hawkish":
+        checklist.append("CB tone divergence dove→hawk")
+        quote_strength += 1
 
+    # ── YIELD SPREAD ────────────────────────────────────────────
     spread = get_yield_spread(base_ccy, quote_ccy)
-    if spread['spread'] > 0 and spread['momentum'] == 'rising':
-        checklist.append(f"Yield spread rising in favor: {spread['spread']}bps")
-        base_strength += 1
+    if abs(spread["cross_10"]) >= 30 and spread["momentum"] == "widening":
+        checklist.append(f"Yield spread +{spread['cross_10']} bp widening")
+        if spread["cross_10"] > 0:
+            base_strength += 1
+        else:
+            quote_strength += 1
 
+    # ── COT EXTREMES ────────────────────────────────────────────
     cot = get_cot_positioning(base_ccy)
-    if abs(cot['extreme_zscore']) > 1.5:
-        checklist.append(f"COT extreme position: z={cot['extreme_zscore']}")
+    if abs(cot["extreme_zscore"]) > 1.5:
+        checklist.append(f"COT extreme z = {cot['extreme_zscore']}")
 
+    # ── RETAIL SENTIMENT ────────────────────────────────────────
     sentiment = get_retail_sentiment(pair)
-    if sentiment['retail_against']:
-        checklist.append("Retail is on wrong side")
+    if sentiment["retail_against"]:
+        checklist.append("Retail crowd on wrong side")
 
+    # ── INTER-MARKET CORRELATION ────────────────────────────────
     if get_intermarket_agreement(pair):
-        checklist.append("Intermarket correlation confirmed")
+        checklist.append("Inter-market correlation confirmed")
 
-    if get_technical_pattern(pair)['key_level_broken']:
+    # ── TECHNICAL PATTERN ───────────────────────────────────────
+    if get_technical_pattern(pair)["key_level_broken"]:
         checklist.append("Major S/R break or clean pattern")
 
+    # ── CATALYST ALIGNMENT ──────────────────────────────────────
     catalyst = get_upcoming_catalyst(pair)
-    if catalyst['bias_alignment']:
+    if catalyst["bias_alignment"]:
         checklist.append(f"Catalyst aligns: {catalyst['event']}")
 
+    # ── SUMMARY PRINT ───────────────────────────────────────────
     print("\n========= SCAN RESULT =========")
     print(f"Pair: {pair}")
     for item in checklist:
         print(f"✅ {item}")
     print(f"Total confluences: {len(checklist)}")
 
+    # ── DIRECTION & ALERT ───────────────────────────────────────
     direction = "long" if base_strength >= quote_strength else "short"
 
     if len(checklist) >= 2:
@@ -552,6 +664,7 @@ def scan_trade_opportunity(pair, base_ccy, quote_ccy):
         log_trade(pair, checklist)
     else:
         print("❌ Not enough edge for swing entry")
+
 
 
 

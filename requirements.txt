@@ -1,4 +1,13 @@
-requests
-pandas
-beautifulsoup4
-schedule
+# ---- core HTTP / parsing ----
+requests>=2.31
+httpx>=0.27          # async bond-spread fetches
+beautifulsoup4>=4.12
+lxml>=5.2            # fast HTML parser for bs4
+feedparser>=6.0      # RSS grab for CB tone
+
+# ---- data wrangling ----
+pandas>=2.2
+numpy>=1.26
+
+# ---- env-var loader ----
+python-dotenv>=1.0

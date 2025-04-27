@@ -55,38 +55,49 @@ CENTRAL_BANK_TONE = {
 # --- DATA FUNCTIONS ---
 def get_cot_positioning(currency):
     try:
-        code_map = {
-            "USD": None,
-            "EUR": "CFTC/EU_F_L_ALL",
-            "GBP": "CFTC/PO_F_L_ALL",
-            "JPY": "CFTC/JY_F_L_ALL",
-            "AUD": "CFTC/AU_F_L_ALL",
-            "CAD": "CFTC/CD_F_L_ALL",
-            "CHF": "CFTC/SF_F_L_ALL",
-            "NZD": "CFTC/NE_F_L_ALL"
+        # Mapping forex currency to TradingView futures symbol
+        futures_map = {
+            "GBP": "CME_GBP1!",
+            "EUR": "CME_EUR1!",
+            "JPY": "CME_JPY1!",
+            "AUD": "CME_AD1!",
+            "CAD": "CME_CD1!",
+            "CHF": "CME_CHF1!",
+            "NZD": "CME_NZD1!"
         }
-        code = code_map.get(currency.upper())
-        if not code:
+
+        symbol = futures_map.get(currency.upper())
+        if not symbol:
             return {"net_spec_position": 0, "extreme_zscore": 0.0}
-        
-        url = f"https://data.nasdaq.com/api/v3/datasets/{code}.json?api_key={QUANDL_API_KEY}"
-        response = requests.get(url)
-        if response.status_code != 200:
-            print(f"⚠️ COT fetch failed ({currency}): {response.status_code}")
-            return {"net_spec_position": 0, "extreme_zscore": 0.0}
-        
-        data = response.json()["dataset"]["data"]
-        df = pd.DataFrame(data, columns=response.json()["dataset"]["column_names"])
-        spec_net = df["Net Position"] if "Net Position" in df.columns else df.iloc[:, -1]
-        zscore = (spec_net.iloc[0] - spec_net.mean()) / spec_net.std()
-        return {
-            "net_spec_position": spec_net.iloc[0],
-            "extreme_zscore": round(zscore, 2)
-        }
-    except Exception as e:
-        print(f"⚠️ COT data fetch error for {currency}: {e}")
+
+        url = f"https://www.tradingview.com/symbols/{symbol}/technicals/"
+        page = requests.get(url, headers={"User-Agent": "Mozilla/5.0"})
+        soup = BeautifulSoup(page.content, "html.parser")
+
+        # TradingView stores COT net speculator positioning in a JavaScript variable inside the page
+        scripts = soup.find_all("script")
+        for script in scripts:
+            if "net_position" in script.text:
+                # Brutal but simple parsing
+                text = script.text
+                start = text.find("net_position") + len("net_position") + 2
+                end = text.find(",", start)
+                net_position = int(text[start:end])
+                
+                # Rough proxy: if positioning is very high or very low compared to historic norm
+                extreme = abs(net_position) > 20000  # Customize threshold if needed
+                extreme_zscore = 2.0 if extreme else 0.5
+                return {
+                    "net_spec_position": net_position,
+                    "extreme_zscore": extreme_zscore
+                }
+
+        # If parsing fails
         return {"net_spec_position": 0, "extreme_zscore": 0.0}
 
+    except Exception as e:
+        print(f"⚠️ TradingView COT fetch error for {currency}: {e}")
+        return {"net_spec_position": 0, "extreme_zscore": 0.0}
 
 
 

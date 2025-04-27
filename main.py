@@ -490,14 +490,25 @@ def is_volatility_sufficient(pair):
         print(f"⚠️ Error in 4H volatility check for {pair}: {e}")
         return True  # Fail safe: assume volatility is fine if error
 
+def is_in_killzone():
+    now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=10)))  # AEST timezone
+    current_hour = now.hour
+        return 17 <= current_hour <= 22  # 17 = 5PM, 22 = 10PM
 
 
 def scan_trade_opportunity(pair, base_ccy, quote_ccy):
+    if not is_in_killzone():
+        print(f"⚠️ Skipping {pair} — outside kill zone hours (5PM–10PM AEST)")
+        return
+
     if not is_volatility_sufficient(pair):
         return
+
     checklist = []
     base_strength = 0
     quote_strength = 0
+
+    # (Then your macro + technical scanning continues as normal...)
 
     tone = get_central_bank_tone(base_ccy)
     if tone['tone'] == 'hawkish':

@@ -17,6 +17,19 @@ load_dotenv()          # <- pulls variables from .env
 
 print(f"🛠 Running Python version: {sys.version}", flush=True)
 
+# ---- scoring weights -----------------------------------------
+WEIGHTS = {
+    "CB tone divergence hawk→dove": 1.0,
+    "CB tone divergence dove→hawk": 1.0,      # treat both directions equal
+    "Yield spread":                 1.0,      # string assembled later
+    "COT extreme":                  1.5,
+    "Retail crowd on wrong side":   1.0,
+    "Inter-market correlation confirmed": 1.0,
+    "Major S/R break or clean pattern": 0.5,
+    "Catalyst aligns":              0.5,
+}
+SCORE_THRESHOLD = 4            # ~equivalent to 4 “strong” ticks
+
 # --- CONFIG (pulled from .env) ---------------------------------
 from dotenv import load_dotenv
 load_dotenv()                       # ← keep this near the imports
@@ -591,6 +604,23 @@ def is_in_killzone():
     current_hour = now.hour
     return 17 <= current_hour <= 22  # 17 = 5PM, 22 = 10PM
 
+# ───────────────────────────────────────────────────────────────
+# Weighted checklist configuration
+# ----------------------------------------------------------------
+WEIGHTS = {
+    "CB tone divergence hawk→dove":           1.0,
+    "CB tone divergence dove→hawk":           1.0,
+    "Yield spread":                           1.0,
+    "COT extreme":                            1.5,   # when re-enabled
+    "Retail crowd on wrong side":             1.0,
+    "Inter-market correlation confirmed":     1.0,
+    "Major S/R break or clean pattern":       0.5,
+    "Catalyst aligns":                        0.5,
+}
+
+SCORE_THRESHOLD = 4        # minimum weighted points to validate a trade
+# ───────────────────────────────────────────────────────────────
+
 
 def scan_trade_opportunity(pair, base_ccy, quote_ccy):
     # ── hard filters ─────────────────────────────────────────────
@@ -601,7 +631,7 @@ def scan_trade_opportunity(pair, base_ccy, quote_ccy):
     if not is_volatility_sufficient(pair):
         return
 
-    # ── initialise checklist ────────────────────────────────────
+    # ── initialise checklist & strength tallies ─────────────────
     checklist      = []
     base_strength  = 0
     quote_strength = 0
@@ -609,61 +639,79 @@ def scan_trade_opportunity(pair, base_ccy, quote_ccy):
     # ── CENTRAL-BANK TONE ───────────────────────────────────────
     tone_base  = get_central_bank_tone(base_ccy)["tone"]
     tone_quote = get_central_bank_tone(quote_ccy)["tone"]
+
     if tone_base == "hawkish" and tone_quote == "dovish":
-        checklist.append("CB tone divergence hawk→dove")
+        key  = "CB tone divergence hawk→dove"
+        checklist.append(key)
         base_strength += 1
     elif tone_base == "dovish" and tone_quote == "hawkish":
-        checklist.append("CB tone divergence dove→hawk")
+        key  = "CB tone divergence dove→hawk"
+        checklist.append(key)
         quote_strength += 1
 
     # ── YIELD SPREAD ────────────────────────────────────────────
     spread = get_yield_spread(base_ccy, quote_ccy)
     if abs(spread["cross_10"]) >= 30 and spread["momentum"] == "widening":
-        checklist.append(f"Yield spread +{spread['cross_10']} bp widening")
+        key  = "Yield spread"
+        line = f"{key} +{spread['cross_10']} bp widening"
+        checklist.append(line)
         if spread["cross_10"] > 0:
             base_strength += 1
         else:
             quote_strength += 1
 
-    # ── COT EXTREMES ────────────────────────────────────────────
-    cot = get_cot_positioning(base_ccy)
-    if abs(cot["extreme_zscore"]) > 1.5:
-        checklist.append(f"COT extreme z = {cot['extreme_zscore']}")
-
     # ── RETAIL SENTIMENT ────────────────────────────────────────
     sentiment = get_retail_sentiment(pair)
     if sentiment["retail_against"]:
-        checklist.append("Retail crowd on wrong side")
+        key  = "Retail crowd on wrong side"
+        checklist.append(key)
 
     # ── INTER-MARKET CORRELATION ────────────────────────────────
     if get_intermarket_agreement(pair):
-        checklist.append("Inter-market correlation confirmed")
+        key = "Inter-market correlation confirmed"
+        checklist.append(key)
 
     # ── TECHNICAL PATTERN ───────────────────────────────────────
     if get_technical_pattern(pair)["key_level_broken"]:
-        checklist.append("Major S/R break or clean pattern")
+        key = "Major S/R break or clean pattern"
+        checklist.append(key)
 
     # ── CATALYST ALIGNMENT ──────────────────────────────────────
     catalyst = get_upcoming_catalyst(pair)
     if catalyst["bias_alignment"]:
-        checklist.append(f"Catalyst aligns: {catalyst['event']}")
+        key  = "Catalyst aligns"
+        line = f"{key}: {catalyst['event']}"
+        checklist.append(line)
 
-    # ── SUMMARY PRINT ───────────────────────────────────────────
+    # ── COT EXTREME (optional – keep if you re-enable) ──────────
+    # cot = get_cot_positioning(base_ccy)
+    # if abs(cot["extreme_zscore"]) > 1.5:
+    #     key  = "COT extreme"
+    #     line = f"{key}: z={cot['extreme_zscore']:.1f}"
+    #     checklist.append(line)
+
+    # ── weighted score calculation ──────────────────────────────
+    score = 0.0
+    for item in checklist:
+        key = item.split(":")[0].split("+")[0].strip()
+        score += WEIGHTS.get(key, 0)
+
+    # ── console summary ─────────────────────────────────────────
     print("\n========= SCAN RESULT =========")
     print(f"Pair: {pair}")
     for item in checklist:
         print(f"✅ {item}")
-    print(f"Total confluences: {len(checklist)}")
+    print(f"Weighted score: {score:.1f}")
 
-    # ── DIRECTION & ALERT ───────────────────────────────────────
+    # ── direction & decision ────────────────────────────────────
     direction = "long" if base_strength >= quote_strength else "short"
 
-    if len(checklist) >= 2:
-        print(f"✅ TRADE VALIDATED ({len(checklist)}/7, {direction.upper()} {pair})")
+    if score >= SCORE_THRESHOLD:
+        print(f"✅ TRADE VALIDATED ({score:.1f} pts, {direction.upper()} {pair})")
         send_email_alert(pair, checklist, direction)
-        log_trade(pair, checklist)
+        log_trade(pair, checklist + [f"SCORE={score:.1f}"])
     else:
-        print("❌ Not enough edge for swing entry")
+        print(f"❌ Not enough score ({score:.1f} / {SCORE_THRESHOLD})")
 
 
 

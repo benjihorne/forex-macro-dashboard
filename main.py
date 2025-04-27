@@ -364,26 +364,24 @@ def log_trade(pair, checklist):
 def precision_filters(pair, base_ccy, quote_ccy, direction):
     now_utc = datetime.datetime.utcnow()
 
-    # 1. Time of Day Filter (only trade between 08:00–16:00 UTC)
+    # 1. Time of Day Filter
     if not (8 <= now_utc.hour <= 16):
         print(f"❌ Skipping {pair} — Outside optimal trading hours ({now_utc.hour}:00 UTC)")
         return False
 
-    # 2. Volatility Filter (ATR 14 Daily)
+    # 2. Volatility Filter (ATR)
     try:
         url = f"https://financialmodelingprep.com/api/v3/historical-price-full/{base_ccy}{quote_ccy}=X?serietype=line&timeseries=20&apikey={FMP_API_KEY}"
         res = requests.get(url).json()
         closes = [float(day['close']) for day in res['historical']]
         atr = np.mean([abs(closes[i] - closes[i-1]) for i in range(1, len(closes))])
-        minimum_atr_threshold = 0.0025  # Adjust this if needed based on your pairs
+        minimum_atr_threshold = 0.0025
         if atr < minimum_atr_threshold:
             print(f"❌ Skipping {pair} — Volatility too low (ATR={atr:.5f})")
             return False
     except Exception as e:
         print(f"⚠️ ATR fetch error for {pair}: {e}")
         return False
-
-    return True  # Temporary — we'll add more filters after this
 
     # 3. Higher Timeframe Trend Filter (Daily 50 MA)
     try:
@@ -411,7 +409,7 @@ def precision_filters(pair, base_ccy, quote_ccy, direction):
         print(f"⚠️ Trend fetch error for {pair}: {e}")
         return False
 
-    # 4. Structural Level Breakout Filter (10-day high/low)
+    # 4. Structural Level Breakout Filter (10-day High/Low)
     try:
         recent_high = closes_daily[-10:].max()
         recent_low = closes_daily[-10:].min()
@@ -445,6 +443,10 @@ def precision_filters(pair, base_ccy, quote_ccy, direction):
         except Exception as e:
             print(f"⚠️ DXY fetch error for {pair}: {e}")
             return False
+
+    # ✅ If ALL filters pass
+    return True
+
 
 
 

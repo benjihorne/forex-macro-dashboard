@@ -503,18 +503,18 @@ def scan_trade_opportunity(pair, base_ccy, quote_ccy):
 
 def auto_run_dashboard():
     print("🚀 __main__ reached — scheduled scan mode active", flush=True)
-    scanned_today = set()
+    scanned_hours_today = set()
 
     while True:
-        now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=10)))  # AEST (UTC+10)
+        now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=10)))  # AEST
         current_time = now.strftime("%H:%M")
 
-        # Reset set at midnight
+        # Reset scanned hours at midnight
         if current_time == "00:00":
-            scanned_today.clear()
+            scanned_hours_today.clear()
 
-        # Scan only at 06:00 and 18:00 local time
-        if current_time in ["06:00", "18:00"] and current_time not in scanned_today:
+        # Scan exactly at every new hour
+        if now.minute == 0 and now.hour not in scanned_hours_today:
             print(f"\n🕕 Running scheduled scan at {current_time} AEST", flush=True)
             print(f"[SCAN START] {datetime.datetime.utcnow()} UTC", flush=True)
 
@@ -525,9 +525,10 @@ def auto_run_dashboard():
                     print(f"⚠️ Error during scan: {e}", flush=True)
                 print("---------------------------------------", flush=True)
 
-            scanned_today.add(current_time)
+            scanned_hours_today.add(now.hour)
 
         time.sleep(60)
+
 
 
 if __name__ == "__main__":

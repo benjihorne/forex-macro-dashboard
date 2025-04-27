@@ -10,6 +10,8 @@ from bs4 import BeautifulSoup
 import time
 import os
 import sys
+import numpy as np  # Already in your code, but make sure it's there
+
 
 print(f"🛠 Running Python version: {sys.version}", flush=True)
 
@@ -348,43 +350,145 @@ def log_trade(pair, checklist):
         pass
     df.to_csv(LOG_FILE, index=False)
 
+def precision_filters(pair, base_ccy, quote_ccy, direction):
+    now_utc = datetime.datetime.utcnow()
+
+    # 1. Time of Day Filter (only trade between 08:00–16:00 UTC)
+    if not (8 <= now_utc.hour <= 16):
+        print(f"❌ Skipping {pair} — Outside optimal trading hours ({now_utc.hour}:00 UTC)")
+        return False
+
+    # 2. Volatility Filter (ATR 14 Daily)
+    try:
+        url = f"https://financialmodelingprep.com/api/v3/historical-price-full/{base_ccy}{quote_ccy}=X?serietype=line&timeseries=20&apikey={FMP_API_KEY}"
+        res = requests.get(url).json()
+        closes = [float(day['close']) for day in res['historical']]
+        atr = np.mean([abs(closes[i] - closes[i-1]) for i in range(1, len(closes))])
+        minimum_atr_threshold = 0.0025  # Adjust this if needed based on your pairs
+        if atr < minimum_atr_threshold:
+            print(f"❌ Skipping {pair} — Volatility too low (ATR={atr:.5f})")
+            return False
+    except Exception as e:
+        print(f"⚠️ ATR fetch error for {pair}: {e}")
+        return False
+
+    return True  # Temporary — we'll add more filters after this
+
+    # 3. Higher Timeframe Trend Filter (Daily 50 MA)
+    try:
+        url = f"https://financialmodelingprep.com/api/v3/historical-chart/1hour/{base_ccy}{quote_ccy}=X?apikey={FMP_API_KEY}"
+        res = requests.get(url).json()
+        df = pd.DataFrame(res)
+        df['datetime'] = pd.to_datetime(df['date'])
+        df.set_index('datetime', inplace=True)
+        closes = df['close'].sort_index()
+        closes_daily = closes.resample('D').last().dropna()
+
+        if len(closes_daily) < 60:
+            print(f"⚠️ Not enough daily data for {pair} to check trend")
+            return False
+
+        ma50 = closes_daily.rolling(window=50).mean()
+        last_close = closes_daily.iloc[-1]
+        last_ma50 = ma50.iloc[-1]
+
+        daily_trend = "long" if last_close > last_ma50 else "short"
+        if daily_trend != direction:
+            print(f"❌ Skipping {pair} — Daily trend mismatch ({daily_trend.upper()} vs {direction.upper()})")
+            return False
+    except Exception as e:
+        print(f"⚠️ Trend fetch error for {pair}: {e}")
+        return False
+
+    # 4. Structural Level Breakout Filter (10-day high/low)
+    try:
+        recent_high = closes_daily[-10:].max()
+        recent_low = closes_daily[-10:].min()
+        last_close = closes_daily.iloc[-1]
+
+        if direction == "long" and last_close < recent_high:
+            print(f"❌ Skipping {pair} — No breakout above recent high ({last_close:.5f} vs {recent_high:.5f})")
+            return False
+        if direction == "short" and last_close > recent_low:
+            print(f"❌ Skipping {pair} — No breakdown below recent low ({last_close:.5f} vs {recent_low:.5f})")
+            return False
+    except Exception as e:
+        print(f"⚠️ Structure level check error for {pair}: {e}")
+        return False
+
+    # 5. DXY Context Filter (for USD pairs)
+    if "USD" in [base_ccy, quote_ccy]:
+        try:
+            dxy_url = f"https://financialmodelingprep.com/api/v3/historical-price-full/DXY?serietype=line&timeseries=10&apikey={FMP_API_KEY}"
+            dxy_res = requests.get(dxy_url).json()
+            dxy_closes = [float(day['close']) for day in dxy_res['historical']]
+            dxy_trend = "up" if dxy_closes[-1] > dxy_closes[-5] else "down"
+
+            if base_ccy == "USD" and direction == "short" and dxy_trend == "up":
+                print(f"❌ Skipping {pair} — USD strength contradicts SHORT idea")
+                return False
+
+            if quote_ccy == "USD" and direction == "long" and dxy_trend == "up":
+                print(f"❌ Skipping {pair} — USD strength contradicts LONG idea")
+                return False
+        except Exception as e:
+            print(f"⚠️ DXY fetch error for {pair}: {e}")
+            return False
+
+
+
 def scan_trade_opportunity(pair, base_ccy, quote_ccy):
     checklist = []
     base_strength = 0
     quote_strength = 0
+
     tone = get_central_bank_tone(base_ccy)
     if tone['tone'] == 'hawkish':
         checklist.append("Macro favors base currency")
         base_strength += 1
+
     spread = get_yield_spread(base_ccy, quote_ccy)
     if spread['spread'] > 0 and spread['momentum'] == 'rising':
         checklist.append(f"Yield spread rising in favor: {spread['spread']}bps")
         base_strength += 1
+
     cot = get_cot_positioning(base_ccy)
     if abs(cot['extreme_zscore']) > 1.5:
         checklist.append(f"COT extreme position: z={cot['extreme_zscore']}")
+
     sentiment = get_retail_sentiment(pair)
     if sentiment['retail_against']:
         checklist.append("Retail is on wrong side")
+
     if get_intermarket_agreement(pair):
         checklist.append("Intermarket correlation confirmed")
+
     if get_technical_pattern(pair)['key_level_broken']:
         checklist.append("Major S/R break or clean pattern")
+
     catalyst = get_upcoming_catalyst(pair)
     if catalyst['bias_alignment']:
         checklist.append(f"Catalyst aligns: {catalyst['event']}")
+
     print("\n========= SCAN RESULT =========")
     print(f"Pair: {pair}")
     for item in checklist:
         print(f"✅ {item}")
     print(f"Total confluences: {len(checklist)}")
+
     direction = "long" if base_strength >= quote_strength else "short"
+
+    # Precision filters
+    if not precision_filters(pair, base_ccy, quote_ccy, direction):
+        return
+
     if len(checklist) >= 2:
         print(f"✅ TRADE VALIDATED ({len(checklist)}/7, {direction.upper()} {pair})")
         send_email_alert(pair, checklist, direction)
         log_trade(pair, checklist)
     else:
         print("❌ Not enough edge for swing entry")
+
 
 def auto_run_dashboard():
     print("🚀 __main__ reached — scheduled scan mode active", flush=True)

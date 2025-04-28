@@ -63,6 +63,22 @@ TRADE_PAIRS = [
 RUN_INTERVAL_SECONDS = 21600  # Scan every 6 hours (6 * 60 * 60 seconds) to stay well within free API limits
 
 
+# --- API Health Check -----------------------------------------
+
+def api_health_check():
+    try:
+        test_url = f"https://financialmodelingprep.com/api/v3/quote/AAPL?apikey={FMP_API_KEY}"
+        res = requests.get(test_url)
+        if res.status_code == 200:
+            print("✅ API health check passed.")
+            return True
+        else:
+            print(f"⚠️ API health check failed: {res.status_code}")
+            return False
+    except Exception as e:
+        print(f"⚠️ API health check exception: {e}")
+        return False
+
 
 # --- DATA FUNCTIONS ---
 def get_cot_positioning(currency):
@@ -623,6 +639,10 @@ SCORE_THRESHOLD = 4        # minimum weighted points to validate a trade
 
 def scan_trade_opportunity(pair, base_ccy, quote_ccy):
     # ── hard filters ─────────────────────────────────────────────
+    if not api_health_check():
+        print(f"⚠️ Skipping scan for {pair} — API unhealthy.")
+        return
+
     if not is_in_killzone():
         print(f"⚠️ Skipping {pair} — outside kill zone hours (5 PM–10 PM AEST)")
         return

@@ -702,13 +702,6 @@ def scan_trade_opportunity(pair, base_ccy, quote_ccy):
         line = f"{key}: {catalyst['event']}"
         checklist.append(line)
 
-    # ── COT EXTREME (optional – keep if you re-enable) ──────────
-    # cot = get_cot_positioning(base_ccy)
-    # if abs(cot["extreme_zscore"]) > 1.5:
-    #     key  = "COT extreme"
-    #     line = f"{key}: z={cot['extreme_zscore']:.1f}"
-    #     checklist.append(line)
-
     # ── weighted score calculation ──────────────────────────────
     score = 0.0
     for item in checklist:
@@ -732,6 +725,8 @@ def scan_trade_opportunity(pair, base_ccy, quote_ccy):
     else:
         print(f"❌ Not enough score ({score:.1f} / {SCORE_THRESHOLD})")
 
+    # ── NEW ADDITION: always print direction bias cleanly ────────
+    print(f"📢 Direction Bias (based on checklist strength): {direction.upper()} {pair}")
 
 
 

@@ -81,51 +81,58 @@ def api_health_check():
 
 
 # --- DATA FUNCTIONS ---
+import requests
+import numpy as np
+
 def get_cot_positioning(currency):
     try:
-        # Mapping forex currency to TradingView futures symbol
+        # Mapping: currency to correct futures code
         futures_map = {
-            "GBP": "CME_GBP1!",
-            "EUR": "CME_EUR1!",
-            "JPY": "CME_JPY1!",
-            "AUD": "CME_AD1!",
-            "CAD": "CME_CD1!",
-            "CHF": "CME_CHF1!",
-            "NZD": "CME_NZD1!"
+            "EUR": "097741",  # Euro FX
+            "JPY": "097742",  # Japanese Yen
+            "GBP": "096742",  # British Pound
+            "AUD": "232741",  # Australian Dollar
+            "CAD": "090741",  # Canadian Dollar
+            "CHF": "082741",  # Swiss Franc
+            "NZD": "112741",  # NZD (if you want to add later)
         }
 
-        symbol = futures_map.get(currency.upper())
-        if not symbol:
+        code = futures_map.get(currency.upper())
+        if not code:
             return {"net_spec_position": 0, "extreme_zscore": 0.0}
 
-        url = f"https://www.tradingview.com/symbols/{symbol}/technicals/"
-        page = requests.get(url, headers={"User-Agent": "Mozilla/5.0"})
-        soup = BeautifulSoup(page.content, "html.parser")
+        url = f"https://data.nasdaq.com/api/v3/datasets/CFTC/{code}_FO_L_ALL/data.json?api_key={QUANDL_API_KEY}"
+        res = requests.get(url)
+        data = res.json()["dataset"]["data"]
 
-        # TradingView stores COT net speculator positioning in a JavaScript variable inside the page
-        scripts = soup.find_all("script")
-        for script in scripts:
-            if "net_position" in script.text:
-                # Brutal but simple parsing
-                text = script.text
-                start = text.find("net_position") + len("net_position") + 2
-                end = text.find(",", start)
-                net_position = int(text[start:end])
-                
-                # Rough proxy: if positioning is very high or very low compared to historic norm
-                extreme = abs(net_position) > 20000  # Customize threshold if needed
-                extreme_zscore = 2.0 if extreme else 0.5
-                return {
-                    "net_spec_position": net_position,
-                    "extreme_zscore": extreme_zscore
-                }
+        net_positions = []
+        for row in data[:52]:  # 52 weeks of data
+            try:
+                non_com_long = row[8]
+                non_com_short = row[9]
+                net = non_com_long - non_com_short
+                net_positions.append(net)
+            except:
+                continue
 
-        # If parsing fails
-        return {"net_spec_position": 0, "extreme_zscore": 0.0}
+        if len(net_positions) < 30:
+            return {"net_spec_position": 0, "extreme_zscore": 0.0}
+
+        latest = net_positions[0]
+        mean = np.mean(net_positions[1:])
+        std = np.std(net_positions[1:])
+        z = (latest - mean) / std if std > 0 else 0
+
+        extreme = abs(z) >= 1.5
+        return {
+            "net_spec_position": latest,
+            "extreme_zscore": round(z, 2),
+        }
 
     except Exception as e:
-        print(f"⚠️ TradingView COT fetch error for {currency}: {e}")
+        print(f"⚠️ COT fetch error for {currency}: {e}")
         return {"net_spec_position": 0, "extreme_zscore": 0.0}
+
 
 
 

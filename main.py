@@ -242,7 +242,9 @@ def get_central_bank_tone(ccy):
         for entry in feedparser.parse(url).entries[:5]:
             ts = datetime.datetime(*entry.published_parsed[:6]).date()
             if ts == today:
-                texts.append((entry.title + " " + entry.summary).lower())
+                title = entry.title if hasattr(entry, "title") else ""
+                summary = getattr(entry, "summary", "")
+                texts.append((title + " " + summary).lower())
 
     blob = " ".join(texts)
     if any(k in blob for k in HAWKISH):
@@ -427,8 +429,8 @@ def get_upcoming_catalyst(pair):
             try:
                 event_time = datetime.datetime.strptime(event["date"], "%Y-%m-%d %H:%M:%S")
                 if now <= event_time <= now + datetime.timedelta(hours=48):
-                    if event["country"] in currencies or event["currency"] in currencies:
-                        upcoming.append(event["event"])
+                    if event.get("country") in currencies or event.get("currency") in currencies:
+                        upcoming.append(event.get("event", "Unknown Event"))
             except Exception:
                 continue
 
@@ -440,7 +442,6 @@ def get_upcoming_catalyst(pair):
     except Exception as e:
         print(f"⚠️ Catalyst fetch error: {e}")
         return {"event": None, "bias_alignment": False}
-
 
 
 # ───────────────── EMAIL & JOURNAL WITH WEIGHTED SCORE ─────────────

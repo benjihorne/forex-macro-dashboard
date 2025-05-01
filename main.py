@@ -711,7 +711,13 @@ def scan_trade_opportunity(pair, base_ccy, quote_ccy):
         line = f"{key}: {catalyst['event']}"
         checklist.append(line)
 
-       # ✅ COT — ENABLED
+    # Weighted Score
+    score = 0.0
+    for item in checklist:
+        key = item.split(":")[0].split("+")[0].strip()
+        score += WEIGHTS.get(key, 0)
+
+    # ✅ COT — ENABLED
     cot = get_cot_positioning(base_ccy)
     risk_pct = 2.0 if score >= 5 else 1.0  # default risk % based on strength
 
@@ -729,14 +735,7 @@ def scan_trade_opportunity(pair, base_ccy, quote_ccy):
         risk_pct = 0.5
         checklist.append(f"❌ Risk reduced to {risk_pct}% due to sentiment reversal")
 
-
-
-    # Weighted Score
-    score = 0.0
-    for item in checklist:
-        key = item.split(":")[0].split("+")[0].strip()
-        score += WEIGHTS.get(key, 0)
-
+    # Print result
     print("\n========= SCAN RESULT =========")
     print(f"Pair: {pair}")
     for item in checklist:
@@ -753,6 +752,7 @@ def scan_trade_opportunity(pair, base_ccy, quote_ccy):
         print(f"❌ Not enough score ({score:.1f} / {SCORE_THRESHOLD})")
 
     print(f"📢 Direction Bias (based on checklist strength): {direction.upper()} {pair}")
+
 
 # ───────────────────────────────────────────────────────────────
 # Weighted checklist configuration
@@ -785,7 +785,8 @@ def auto_run_dashboard():
         # Scan exactly at every new hour
         if now.minute == 0 and now.hour not in scanned_hours_today:
             print(f"\n🕕 Running scheduled scan at {current_time} AEST", flush=True)
-            print(f"[SCAN START] {datetime.datetime.utcnow()} UTC", flush=True)
+            print(f"[SCAN START] {datetime.datetime.now(datetime.timezone.utc)
+} UTC", flush=True)
 
             for pair, base, quote in TRADE_PAIRS:
                 try:
@@ -799,4 +800,14 @@ def auto_run_dashboard():
         time.sleep(60)
 
 if __name__ == "__main__":
-    auto_run_dashboard()
+    if len(sys.argv) > 1 and sys.argv[1] == "run_once":
+        print("🚨 Manual scan trigger — running full scan now...\n")
+        for pair, base, quote in TRADE_PAIRS:
+            try:
+                scan_trade_opportunity(pair, base, quote)
+            except Exception as e:
+                print(f"⚠️ Error during manual scan of {pair}: {e}")
+        print("✅ Manual scan complete.")
+    else:
+        auto_run_dashboard()
+

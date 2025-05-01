@@ -771,43 +771,45 @@ WEIGHTS = {
 SCORE_THRESHOLD = 4        # minimum weighted points to validate a trade
 # ───────────────────────────────────────────────────────────────
 def auto_run_dashboard():
-    print("🚀 __main__ reached — scheduled scan mode active", flush=True)
-    scanned_hours_today = set()
+    print("🚀 __main__ reached — 1-minute scan loop active", flush=True)
 
     while True:
         now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=10)))  # AEST
         current_time = now.strftime("%H:%M")
 
-        # Reset scanned hours at midnight
-        if current_time == "00:00":
-            scanned_hours_today.clear()
+        if not (14 <= now.hour < 22):  # Only scan from 14:00 to 21:59 AEST
+            time.sleep(60)
+            continue
 
-        # Scan exactly at every new hour
-        if now.minute == 0 and now.hour not in scanned_hours_today:
-            print(f"\n🕕 Running scheduled scan at {current_time} AEST", flush=True)
-            print(f"[SCAN START] {datetime.datetime.now(datetime.timezone.utc)} UTC", flush=True)
+        print(f"\n🕕 Running scheduled scan at {current_time} AEST", flush=True)
+        print(f"[SCAN START] {datetime.datetime.now(datetime.timezone.utc)} UTC", flush=True)
 
-            for pair, base, quote in TRADE_PAIRS:
-                try:
-                    scan_trade_opportunity(pair, base, quote)
-                except Exception as e:
-                    print(f"⚠️ Error during scan: {e}", flush=True)
-                print("---------------------------------------", flush=True)
-
-            scanned_hours_today.add(now.hour)
-
-        time.sleep(60)
-
-
-if __name__ == "__main__":
-    if len(sys.argv) > 1 and sys.argv[1] == "run_once":
-        print("🚨 Manual scan trigger — running full scan now...\n")
         for pair, base, quote in TRADE_PAIRS:
             try:
                 scan_trade_opportunity(pair, base, quote)
             except Exception as e:
-                print(f"⚠️ Error during manual scan of {pair}: {e}")
-        print("✅ Manual scan complete.")
+                print(f"⚠️ Error during scan of {pair}: {e}", flush=True)
+            print("---------------------------------------", flush=True)
+
+        time.sleep(60)
+
+
+
+if __name__ == "__main__":
+    if len(sys.argv) > 1:
+        if sys.argv[1] == "run_once":
+            print("🚨 Manual scan trigger — running full scan now...\n")
+            for pair, base, quote in TRADE_PAIRS:
+                try:
+                    scan_trade_opportunity(pair, base, quote)
+                except Exception as e:
+                    print(f"⚠️ Error during manual scan of {pair}: {e}")
+            print("✅ Manual scan complete.")
+
+        elif sys.argv[1] == "backtest":
+            from backtest import run_backtest
+            run_backtest()
     else:
         auto_run_dashboard()
+
 

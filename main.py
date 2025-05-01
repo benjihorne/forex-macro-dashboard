@@ -735,23 +735,35 @@ def scan_trade_opportunity(pair, base_ccy, quote_ccy):
         risk_pct = 0.5
         checklist.append(f"❌ Risk reduced to {risk_pct}% due to sentiment reversal")
 
-    # Print result
-    print("\n========= SCAN RESULT =========")
-    print(f"Pair: {pair}")
-    for item in checklist:
-        print(f"✅ {item}")
-    print(f"Weighted score: {score:.1f}")
+       # Print result (clean version)
+    print("\n" + "="*50)
+    print(f"📊 SCAN RESULT for {pair}")
+    print("-" * 50)
+    print(f"🧭 Direction Bias: {direction.upper()}")
+    print(f"🎯 Weighted Score: {score:.1f} / {SCORE_THRESHOLD}")
+    print(f"📉 Risk Applied: {risk_pct:.1f}% of account")
+    print("-" * 50)
 
-    direction = "long" if base_strength >= quote_strength else "short"
+    print("✅ Passed Checklist:")
+    for item in checklist:
+        if item.startswith("✅"):
+            print(f"   {item}")
+    print()
+
+    print("❌ Failed Checklist:")
+    for item in checklist:
+        if item.startswith("❌"):
+            print(f"   {item}")
+    print()
 
     if score >= SCORE_THRESHOLD:
-        print(f"✅ TRADE VALIDATED ({score:.1f} pts, {direction.upper()} {pair})")
+        print(f"🚨 TRADE VALIDATED: {direction.upper()} {pair} ({score:.1f} pts)")
         send_email_alert(pair, checklist, direction, score, risk_pct)
         log_trade(pair, checklist, score)
     else:
-        print(f"❌ Not enough score ({score:.1f} / {SCORE_THRESHOLD})")
+        print(f"⛔ Trade Rejected: Not enough score ({score:.1f} / {SCORE_THRESHOLD})")
 
-    print(f"📢 Direction Bias (based on checklist strength): {direction.upper()} {pair}")
+    print("="*50 + "\n")
 
 
 # ───────────────────────────────────────────────────────────────
@@ -771,21 +783,15 @@ WEIGHTS = {
 SCORE_THRESHOLD = 4        # minimum weighted points to validate a trade
 # ───────────────────────────────────────────────────────────────
 def auto_run_dashboard():
-    print("🚀 __main__ reached — 3-minute scan loop active", flush=True)
-
-    scanned_minutes_today = set()
+    print("🚀 __main__ reached — scheduled scan mode active", flush=True)
+    last_scan_minute = -1  # track last scan
 
     while True:
         now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=10)))  # AEST
         current_time = now.strftime("%H:%M")
 
-        # Killzone only: 2pm to 10pm AEST
-        if not (14 <= now.hour < 22):
-            time.sleep(60)
-            continue
-
-        # Scan every 3 minutes (on 00, 03, 06, ..., 57)
-        if now.minute % 3 == 0 and current_time not in scanned_minutes_today:
+        # Only scan from 14:00 to 21:59 AEST
+        if 14 <= now.hour < 22 and now.minute % 3 == 0 and now.minute != last_scan_minute:
             print(f"\n🕕 Running scheduled scan at {current_time} AEST", flush=True)
             print(f"[SCAN START] {datetime.datetime.now(datetime.timezone.utc)} UTC", flush=True)
 
@@ -796,9 +802,10 @@ def auto_run_dashboard():
                     print(f"⚠️ Error during scan of {pair}: {e}", flush=True)
                 print("---------------------------------------", flush=True)
 
-            scanned_minutes_today.add(current_time)
+            last_scan_minute = now.minute
 
-        time.sleep(30)
+        time.sleep(10)
+
 
 
 

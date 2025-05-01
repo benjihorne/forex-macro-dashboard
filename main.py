@@ -519,13 +519,13 @@ def send_telegram_alert(pair, checklist, direction, score, risk_pct):
         lines.append(f"{symbol} {key}")
 
     lines.append("")
-    lines.append(f"🕓 {datetime.utcnow():%Y-%m-%d %H:%M UTC}")
+    lines.append(f"🕓 {datetime.datetime.now(datetime.timezone.utc):%Y-%m-%d %H:%M UTC}")
 
     message = "\n".join(lines)
 
     url = f"https://api.telegram.org/bot8140548742:AAHSQWrtX4iPS67jx-EQuHEuPSd8yLKS2dQ/sendMessage"
     payload = {
-        "chat_id": "6341171214",
+        "chat_id": "-1002558814562",
         "text": message,
         "parse_mode": "HTML"
     }
@@ -857,6 +857,20 @@ def auto_run_dashboard():
         time.sleep(10)
 
 
+def test_telegram_alert():
+    pair = "TEST/PAIR"
+    checklist = [
+        "✅ CB tone divergence hawk→dove",
+        "❌ COT extreme",
+        "✅ Retail crowd on wrong side",
+        "❌ Catalyst aligns"
+    ]
+    direction = "long"
+    score = 4.5
+    risk_pct = 2.0
+
+    send_telegram_alert(pair, checklist, direction, score, risk_pct)
+    print("📨 Test Telegram alert sent.")
 
 
 
@@ -876,7 +890,24 @@ if __name__ == "__main__":
         elif sys.argv[1] == "backtest":
             from backtest import run_backtest
             run_backtest()
+
+        elif sys.argv[1] == "test_telegram":
+            def test_telegram_alert():
+                pair = "TEST/PAIR"
+                checklist = [
+                    "✅ CB tone divergence hawk→dove",
+                    "❌ COT extreme",
+                    "✅ Retail crowd on wrong side",
+                    "❌ Catalyst aligns"
+                ]
+                direction = "long"
+                score = 4.5
+                risk_pct = 2.0
+                send_telegram_alert(pair, checklist, direction, score, risk_pct)
+                print("📨 Test Telegram alert sent.")
+            
+            test_telegram_alert()
+
     else:
         auto_run_dashboard()
-
 

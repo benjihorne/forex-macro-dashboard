@@ -11,6 +11,10 @@ import time
 import os
 import sys
 import numpy as np  # Already in your code, but make sure it's there
+import io
+import cot_reports as cot
+
+
 
 from dotenv import load_dotenv
 load_dotenv()          # <- pulls variables from .env
@@ -81,57 +85,50 @@ def api_health_check():
 
 
 # --- DATA FUNCTIONS ---
-import requests
-import numpy as np
+
+# ── COT CONTRACT MAPPINGS ─────────────────────────────────────
+import cot_reports as cot
 
 def get_cot_positioning(currency):
     try:
-        # Mapping: currency to correct futures code
-        futures_map = {
-            "EUR": "097741",  # Euro FX
-            "JPY": "097742",  # Japanese Yen
-            "GBP": "096742",  # British Pound
-            "AUD": "232741",  # Australian Dollar
-            "CAD": "090741",  # Canadian Dollar
-            "CHF": "082741",  # Swiss Franc
-            "NZD": "112741",  # NZD (if you want to add later)
+        df = cot.cot_all('legacy_fut', verbose=False)
+
+        contract_map = {
+            "EUR": "EURO FX - CHICAGO MERCANTILE EXCHANGE",
+            "GBP": "BRITISH POUND STERLING - CHICAGO MERCANTILE EXCHANGE",
+            "JPY": "JAPANESE YEN - CHICAGO MERCANTILE EXCHANGE",
+            "AUD": "AUSTRALIAN DOLLAR - CHICAGO MERCANTILE EXCHANGE",
+            "CAD": "CANADIAN DOLLAR - CHICAGO MERCANTILE EXCHANGE"
         }
 
-        code = futures_map.get(currency.upper())
-        if not code:
-            return {"net_spec_position": 0, "extreme_zscore": 0.0}
+        contract_name = contract_map.get(currency.upper())
+        if not contract_name:
+            print(f"❌ No contract mapping found for {currency}")
+            return {"net_spec_position": 0, "extreme_zscore": 0.0, "sentiment_reversal": False}
 
-        url = f"https://data.nasdaq.com/api/v3/datasets/CFTC/{code}_FO_L_ALL/data.json?api_key={QUANDL_API_KEY}"
-        res = requests.get(url)
-        data = res.json()["dataset"]["data"]
+        cot_filtered = df[df['Market and Exchange Names'].str.contains(contract_name, case=False, na=False)]
 
-        net_positions = []
-        for row in data[:52]:  # 52 weeks of data
-            try:
-                non_com_long = row[8]
-                non_com_short = row[9]
-                net = non_com_long - non_com_short
-                net_positions.append(net)
-            except:
-                continue
+        if cot_filtered.empty:
+            print(f"⚠️ No COT data found for {currency} (contract: {contract_name})")
+            return {"net_spec_position": 0, "extreme_zscore": 0.0, "sentiment_reversal": False}
 
-        if len(net_positions) < 30:
-            return {"net_spec_position": 0, "extreme_zscore": 0.0}
+        cot_filtered = cot_filtered.sort_values("As of Date in Form YYYY-MM-DD")
 
-        latest = net_positions[0]
-        mean = np.mean(net_positions[1:])
-        std = np.std(net_positions[1:])
-        z = (latest - mean) / std if std > 0 else 0
+        net_spec = cot_filtered['Noncommercial Positions-Long (All)'] - cot_filtered['Noncommercial Positions-Short (All)']
+        latest_net = net_spec.iloc[-1]
+        zscore = ((latest_net - net_spec.mean()) / net_spec.std()).round(2)
+        reversal = abs(zscore) > 2
 
-        extreme = abs(z) >= 1.5
         return {
-            "net_spec_position": latest,
-            "extreme_zscore": round(z, 2),
+            "net_spec_position": int(latest_net),
+            "extreme_zscore": float(zscore),
+            "sentiment_reversal": reversal
         }
 
     except Exception as e:
-        print(f"⚠️ COT fetch error for {currency}: {e}")
-        return {"net_spec_position": 0, "extreme_zscore": 0.0}
+        print(f"⚠️ COT fetch error for {currency.upper()}: {e}")
+        return {"net_spec_position": 0, "extreme_zscore": 0.0, "sentiment_reversal": False}
+
 
 
 
@@ -627,6 +624,99 @@ def is_in_killzone():
     current_hour = now.hour
     return 17 <= current_hour <= 22  # 17 = 5PM, 22 = 10PM
 
+def scan_trade_opportunity(pair, base_ccy, quote_ccy):
+    if not api_health_check():
+        print(f"⚠️ Skipping scan for {pair} — API unhealthy.")
+        return
+
+    if not is_in_killzone():
+        print(f"⚠️ Skipping {pair} — outside kill zone hours (5 PM–10 PM AEST)")
+        return
+
+    if not is_volatility_sufficient(pair):
+        return
+
+    checklist = []
+    base_strength = 0
+    quote_strength = 0
+
+    # Central Bank Tone
+    tone_base = get_central_bank_tone(base_ccy)["tone"]
+    tone_quote = get_central_bank_tone(quote_ccy)["tone"]
+
+    if tone_base == "hawkish" and tone_quote == "dovish":
+        key = "CB tone divergence hawk→dove"
+        checklist.append(key)
+        base_strength += 1
+    elif tone_base == "dovish" and tone_quote == "hawkish":
+        key = "CB tone divergence dove→hawk"
+        checklist.append(key)
+        quote_strength += 1
+
+    # Yield Spread
+    spread = get_yield_spread(base_ccy, quote_ccy)
+    if abs(spread["cross_10"]) >= 30 and spread["momentum"] == "widening":
+        key = "Yield spread"
+        line = f"{key} +{spread['cross_10']} bp widening"
+        checklist.append(line)
+        if spread["cross_10"] > 0:
+            base_strength += 1
+        else:
+            quote_strength += 1
+
+    # Retail Sentiment
+    sentiment = get_retail_sentiment(pair)
+    if sentiment["retail_against"]:
+        key = "Retail crowd on wrong side"
+        checklist.append(key)
+
+    # Intermarket
+    if get_intermarket_agreement(pair):
+        key = "Inter-market correlation confirmed"
+        checklist.append(key)
+
+    # Technical Pattern
+    if get_technical_pattern(pair)["key_level_broken"]:
+        key = "Major S/R break or clean pattern"
+        checklist.append(key)
+
+    # Catalyst
+    catalyst = get_upcoming_catalyst(pair)
+    if catalyst["bias_alignment"]:
+        key = "Catalyst aligns"
+        line = f"{key}: {catalyst['event']}"
+        checklist.append(line)
+
+    # ✅ COT — ENABLED
+    cot = get_cot_positioning(base_ccy)
+    if abs(cot["extreme_zscore"]) > 1.5:
+        key = "COT extreme"
+        line = f"{key}: z={cot['extreme_zscore']:.1f}"
+        checklist.append(line)
+
+    # Weighted Score
+    score = 0.0
+    for item in checklist:
+        key = item.split(":")[0].split("+")[0].strip()
+        score += WEIGHTS.get(key, 0)
+
+    print("\n========= SCAN RESULT =========")
+    print(f"Pair: {pair}")
+    for item in checklist:
+        print(f"✅ {item}")
+    print(f"Weighted score: {score:.1f}")
+
+    direction = "long" if base_strength >= quote_strength else "short"
+
+    if score >= SCORE_THRESHOLD:
+        print(f"✅ TRADE VALIDATED ({score:.1f} pts, {direction.upper()} {pair})")
+        send_email_alert(pair, checklist, direction, score)
+        log_trade(pair, checklist, score)
+    else:
+        print(f"❌ Not enough score ({score:.1f} / {SCORE_THRESHOLD})")
+
+    print(f"📢 Direction Bias (based on checklist strength): {direction.upper()} {pair}")
+
 # ───────────────────────────────────────────────────────────────
 # Weighted checklist configuration
 # ----------------------------------------------------------------
@@ -644,99 +734,12 @@ WEIGHTS = {
 SCORE_THRESHOLD = 4        # minimum weighted points to validate a trade
 # ───────────────────────────────────────────────────────────────
 
+if __name__ == "__main__":
+    print("⚙️ Testing final integrated COT logic...\n")
 
-def scan_trade_opportunity(pair, base_ccy, quote_ccy):
-    # ── hard filters ─────────────────────────────────────────────
-    if not api_health_check():
-        print(f"⚠️ Skipping scan for {pair} — API unhealthy.")
-        return
-
-    if not is_in_killzone():
-        print(f"⚠️ Skipping {pair} — outside kill zone hours (5 PM–10 PM AEST)")
-        return
-
-    if not is_volatility_sufficient(pair):
-        return
-
-    # ── initialise checklist & strength tallies ─────────────────
-    checklist      = []
-    base_strength  = 0
-    quote_strength = 0
-
-    # ── CENTRAL-BANK TONE ───────────────────────────────────────
-    tone_base  = get_central_bank_tone(base_ccy)["tone"]
-    tone_quote = get_central_bank_tone(quote_ccy)["tone"]
-
-    if tone_base == "hawkish" and tone_quote == "dovish":
-        key  = "CB tone divergence hawk→dove"
-        checklist.append(key)
-        base_strength += 1
-    elif tone_base == "dovish" and tone_quote == "hawkish":
-        key  = "CB tone divergence dove→hawk"
-        checklist.append(key)
-        quote_strength += 1
-
-    # ── YIELD SPREAD ────────────────────────────────────────────
-    spread = get_yield_spread(base_ccy, quote_ccy)
-    if abs(spread["cross_10"]) >= 30 and spread["momentum"] == "widening":
-        key  = "Yield spread"
-        line = f"{key} +{spread['cross_10']} bp widening"
-        checklist.append(line)
-        if spread["cross_10"] > 0:
-            base_strength += 1
-        else:
-            quote_strength += 1
-
-    # ── RETAIL SENTIMENT ────────────────────────────────────────
-    sentiment = get_retail_sentiment(pair)
-    if sentiment["retail_against"]:
-        key  = "Retail crowd on wrong side"
-        checklist.append(key)
-
-    # ── INTER-MARKET CORRELATION ────────────────────────────────
-    if get_intermarket_agreement(pair):
-        key = "Inter-market correlation confirmed"
-        checklist.append(key)
-
-    # ── TECHNICAL PATTERN ───────────────────────────────────────
-    if get_technical_pattern(pair)["key_level_broken"]:
-        key = "Major S/R break or clean pattern"
-        checklist.append(key)
-
-    # ── CATALYST ALIGNMENT ──────────────────────────────────────
-    catalyst = get_upcoming_catalyst(pair)
-    if catalyst["bias_alignment"]:
-        key  = "Catalyst aligns"
-        line = f"{key}: {catalyst['event']}"
-        checklist.append(line)
-
-    # ── weighted score calculation ──────────────────────────────
-    score = 0.0
-    for item in checklist:
-        key = item.split(":")[0].split("+")[0].strip()
-        score += WEIGHTS.get(key, 0)
-
-    # ── console summary ─────────────────────────────────────────
-    print("\n========= SCAN RESULT =========")
-    print(f"Pair: {pair}")
-    for item in checklist:
-        print(f"✅ {item}")
-    print(f"Weighted score: {score:.1f}")
-
-    # ── direction & decision ────────────────────────────────────
-    direction = "long" if base_strength >= quote_strength else "short"
-
-    if score >= SCORE_THRESHOLD:
-        print(f"✅ TRADE VALIDATED ({score:.1f} pts, {direction.upper()} {pair})")
-        send_email_alert(pair, checklist, direction, score)
-        log_trade(pair, checklist, score)
-    else:
-        print(f"❌ Not enough score ({score:.1f} / {SCORE_THRESHOLD})")
-
-    # ── NEW ADDITION: always print direction bias cleanly ────────
-    print(f"📢 Direction Bias (based on checklist strength): {direction.upper()} {pair}")
-
-
+    for currency in ["EUR", "JPY", "GBP", "AUD", "CAD"]:
+        result = get_cot_positioning(currency)
+        print(f"{currency}: Net Spec = {result['net_spec_position']}, Z-Score = {result['extreme_zscore']}")
 
 
 def auto_run_dashboard():
@@ -772,3 +775,4 @@ def auto_run_dashboard():
 if __name__ == "__main__":
     auto_run_dashboard()
 
+# ... (all your function and class code goes here)

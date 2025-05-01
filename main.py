@@ -784,14 +784,18 @@ SCORE_THRESHOLD = 4        # minimum weighted points to validate a trade
 # ───────────────────────────────────────────────────────────────
 def auto_run_dashboard():
     print("🚀 __main__ reached — scheduled scan mode active", flush=True)
-    last_scan_minute = -1  # track last scan
+    scanned_minutes_today = set()
 
     while True:
         now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=10)))  # AEST
         current_time = now.strftime("%H:%M")
 
-        # Only scan from 14:00 to 21:59 AEST
-        if 14 <= now.hour < 22 and now.minute % 3 == 0 and now.minute != last_scan_minute:
+        if not (14 <= now.hour < 22):  # Only scan between 2 PM and 10 PM AEST
+            time.sleep(60)
+            continue
+
+        # Run once every 10 minutes
+        if now.minute % 10 == 0 and current_time not in scanned_minutes_today:
             print(f"\n🕕 Running scheduled scan at {current_time} AEST", flush=True)
             print(f"[SCAN START] {datetime.datetime.now(datetime.timezone.utc)} UTC", flush=True)
 
@@ -802,9 +806,9 @@ def auto_run_dashboard():
                     print(f"⚠️ Error during scan of {pair}: {e}", flush=True)
                 print("---------------------------------------", flush=True)
 
-            last_scan_minute = now.minute
+            scanned_minutes_today.add(current_time)
 
-        time.sleep(10)
+        time.sleep(15)
 
 
 

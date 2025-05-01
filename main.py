@@ -737,32 +737,34 @@ def scan_trade_opportunity(pair, base_ccy, quote_ccy):
         checklist.append(f"❌ Risk reduced to {risk_pct}% due to sentiment reversal")
 
     # ─── Clean Log ─────────────────────────
-print("\n" + "═" * 60)
-print(f"📈 SCANNING PAIR: {pair}")
-print("─" * 60)
-print(f"📍 Direction Bias : {direction.upper()}")
-print(f"🎯 Weighted Score : {score:.1f} / {SCORE_THRESHOLD}")
-print(f"📉 Risk Applied   : {risk_pct:.1f}% of account")
-print("─" * 60)
-print("📋 Checklist:")
+    print("\n" + "═" * 60)
+    print(f"📈 SCANNING PAIR: {pair}")
+    print("─" * 60)
+    print(f"📍 Direction Bias : {direction.upper()}")
+    print(f"🎯 Weighted Score : {score:.1f} / {SCORE_THRESHOLD}")
+    print(f"📉 Risk Applied   : {risk_pct:.1f}% of account")
+    print("─" * 60)
+    print("📋 Checklist:")
 
-for key in WEIGHTS.keys():
-    match = next((item for item in checklist if key in item), None)
-    if match:
-        if "❌" in match:
-            print(f"  ❌ {match[2:]}", flush=True)
+    for key in WEIGHTS.keys():
+        match = next((item for item in checklist if key in item), None)
+        if match:
+            if "❌" in match:
+                print(f"  ❌ {match[2:]}", flush=True)
+            else:
+                print(f"  ✅ {match}", flush=True)
         else:
-            print(f"  ✅ {match}", flush=True)
-    else:
-        print(f"  ❌ {key}", flush=True)
+            print(f"  ❌ {key}", flush=True)
 
-if score >= SCORE_THRESHOLD:
-    print(f"\n✅ TRADE VALIDATED: {direction.upper()} {pair} ({score:.1f} pts)")
-    send_email_alert(pair, checklist, direction, score, risk_pct)
-    log_trade(pair, checklist, score)
-else:
-    print(f"\n⛔ Trade Rejected: Not enough score ({score:.1f} / {SCORE_THRESHOLD})")
-print("═" * 60)
+    if score >= SCORE_THRESHOLD:
+        print(f"\n✅ TRADE VALIDATED: {direction.upper()} {pair} ({score:.1f} pts)")
+        send_email_alert(pair, checklist, direction, score, risk_pct)
+        log_trade(pair, checklist, score)
+    else:
+        print(f"\n⛔ Trade Rejected: Not enough score ({score:.1f} / {SCORE_THRESHOLD})")
+
+    print("═" * 60 + "\n")
+
 
 
 # ───────────────────────────────────────────────────────────────
@@ -780,6 +782,8 @@ WEIGHTS = {
 }
 
 SCORE_THRESHOLD = 4        # minimum weighted points to validate a trade
+
+
 # ───────────────────────────────────────────────────────────────
 def auto_run_dashboard():
     print("🚀 __main__ reached — scheduled scan mode active", flush=True)

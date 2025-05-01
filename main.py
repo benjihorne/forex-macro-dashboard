@@ -785,7 +785,7 @@ def auto_run_dashboard():
         # Scan exactly at every new hour
         if now.minute == 0 and now.hour not in scanned_hours_today:
             print(f"\n🕕 Running scheduled scan at {current_time} AEST", flush=True)
-            print(f"[SCAN START] {datetime.datetime.now(datetime.timezone.utc)}")} UTC", flush=True)
+            print(f"[SCAN START] {datetime.datetime.now(datetime.timezone.utc)} UTC", flush=True)
 
             for pair, base, quote in TRADE_PAIRS:
                 try:
@@ -797,6 +797,7 @@ def auto_run_dashboard():
             scanned_hours_today.add(now.hour)
 
         time.sleep(60)
+
 
 if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "run_once":

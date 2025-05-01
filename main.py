@@ -639,10 +639,14 @@ def is_volatility_sufficient(pair):
         print(f"⚠️ Error in 4H volatility check for {pair}: {e}")
         return True  # Fail safe: assume volatility is fine if error
 
+import datetime
+import pytz  # Make sure this is in your requirements.txt
+
 def is_in_killzone():
-    now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=10)))  # AEST timezone
-    current_hour = now.hour
-    return 17 <= current_hour <= 22  # 17 = 5PM, 22 = 10PM
+    aest = datetime.timezone(datetime.timedelta(hours=10))  # AEST = UTC+10
+    now = datetime.datetime.now(tz=aest)
+    return 14 <= now.hour <= 22  # 2PM to 10PM AEST
+
 
 def scan_trade_opportunity(pair, base_ccy, quote_ccy):
     if not api_health_check():

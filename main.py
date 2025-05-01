@@ -495,6 +495,48 @@ def send_email_alert(pair, checklist, direction, score, risk_pct):
         server.login(EMAIL_SENDER, EMAIL_PASS)
         server.sendmail(EMAIL_SENDER, EMAIL_RECEIVER, msg.as_string())
 
+def send_telegram_alert(pair, checklist, direction, score, risk_pct):
+    """Send bias alert via Telegram."""
+    import requests
+
+    # Format checklist breakdown
+    lines = [f"📈 {pair} — {direction.upper()}"]
+    lines.append(f"🎯 Score: {score:.1f} / 4")
+    lines.append(f"📉 Risk: {risk_pct:.1f}%")
+    lines.append("")
+
+    for key in [
+        "CB tone divergence hawk→dove", "CB tone divergence dove→hawk",
+        "Yield spread", "COT extreme", "Retail crowd on wrong side",
+        "Inter-market correlation confirmed", "Major S/R break or clean pattern",
+        "Catalyst aligns"
+    ]:
+        match = next((item for item in checklist if key in item), None)
+        if match:
+            symbol = "✅" if not match.startswith("❌") else "❌"
+        else:
+            symbol = "❌"
+        lines.append(f"{symbol} {key}")
+
+    lines.append("")
+    lines.append(f"🕓 {datetime.utcnow():%Y-%m-%d %H:%M UTC}")
+
+    message = "\n".join(lines)
+
+    url = f"https://api.telegram.org/bot8140548742:AAHSQWrtX4iPS67jx-EQuHEuPSd8yLKS2dQ/sendMessage"
+    payload = {
+        "chat_id": "6341171214",
+        "text": message,
+        "parse_mode": "HTML"
+    }
+    try:
+        response = requests.post(url, json=payload)
+        response.raise_for_status()
+        print("📬 Telegram alert sent.")
+    except Exception as e:
+        print(f"⚠️ Telegram alert failed: {e}")
+
+
 def log_trade(pair, checklist, score):
     df = pd.DataFrame([{
         "timestamp": datetime.datetime.now(datetime.timezone.utc),
@@ -759,7 +801,9 @@ def scan_trade_opportunity(pair, base_ccy, quote_ccy):
     if score >= SCORE_THRESHOLD:
         print(f"\n✅ TRADE VALIDATED: {direction.upper()} {pair} ({score:.1f} pts)")
         send_email_alert(pair, checklist, direction, score, risk_pct)
+        send_telegram_alert(pair, checklist, direction, score, risk_pct)
         log_trade(pair, checklist, score)
+
     else:
         print(f"\n⛔ Trade Rejected: Not enough score ({score:.1f} / {SCORE_THRESHOLD})")
 

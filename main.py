@@ -455,7 +455,7 @@ def get_upcoming_catalyst(pair):
 
 
 # ───────────────── EMAIL & JOURNAL WITH WEIGHTED SCORE ─────────────
-def send_email_alert(pair, checklist, direction, score):
+def send_email_alert(pair, checklist, direction, score, risk_pct):
     """Send bias alert only when weighted score >= SCORE_THRESHOLD."""
     if score < SCORE_THRESHOLD:
         print(f"❌ Email BLOCKED — score {score:.1f} / {SCORE_THRESHOLD}")
@@ -471,21 +471,22 @@ def send_email_alert(pair, checklist, direction, score):
     failed = [item for item in checklist if item.startswith("❌")]
 
     html = f"""
-    <html><body style='font-family:Arial'>
-        <h2>📈 {pair} bias triggered</h2>
-        <p><b>Direction:</b> {'LONG' if direction == 'long' else 'SHORT'}</p>
-        <p><b>Weighted score:</b> {score:.1f} / {SCORE_THRESHOLD}</p>
+<html><body style='font-family:Arial'>
+    <h2>📈 {pair} bias triggered</h2>
+    <p><b>Direction:</b> {'LONG' if direction == 'long' else 'SHORT'}</p>
+    <p><b>Weighted score:</b> {score:.1f} / {SCORE_THRESHOLD}</p>
+    <p><b>Risk applied:</b> {risk_pct:.1f}% of account</p>
 
-        <h3 style='color:green'>✅ Passed Checklist</h3>
-        <ul>{''.join(f'<li>{item[2:]}</li>' for item in passed)}</ul>
+    <h3 style='color:green'>✅ Passed Checklist</h3>
+    <ul>{''.join(f'<li>{item[2:]}</li>' for item in passed)}</ul>
 
-        <h3 style='color:red'>❌ Failed Checklist</h3>
-        <ul>{''.join(f'<li>{item[2:]}</li>' for item in failed)}</ul>
+    <h3 style='color:red'>❌ Failed Checklist</h3>
+    <ul>{''.join(f'<li>{item[2:]}</li>' for item in failed)}</ul>
 
-        <p style='font-size:13px;margin-top:10px'>🎯 Manually check LTF structure & SL/TP</p>
-        <p style='font-size:12px;color:#888'>UTC: {datetime.datetime.utcnow():%Y-%m-%d %H:%M:%S}</p>
-    </body></html>
-    """
+    <p style='font-size:13px;margin-top:10px'>🎯 Manually check LTF structure & SL/TP</p>
+    <p style='font-size:12px;color:#888'>UTC: {datetime.datetime.utcnow():%Y-%m-%d %H:%M:%S}</p>
+</body></html>
+"""
 
     msg.attach(MIMEText(html, "html"))
 
@@ -707,11 +708,23 @@ def scan_trade_opportunity(pair, base_ccy, quote_ccy):
         checklist.append(line)
 
     # ✅ COT — ENABLED
-    cot = get_cot_positioning(base_ccy)
-    if abs(cot["extreme_zscore"]) > 1.5:
-        key = "COT extreme"
-        line = f"{key}: z={cot['extreme_zscore']:.1f}"
-        checklist.append(line)
+   cot = get_cot_positioning(base_ccy)
+risk_pct = 2.0 if score >= 5 else 1.0  # default risk % based on strength
+
+if abs(cot["extreme_zscore"]) > 1.5:
+    key = "COT extreme"
+    line = f"{key}: z={cot['extreme_zscore']:.1f}"
+    checklist.append(line)
+
+    # Sentiment reversal logic
+    if cot["extreme_zscore"] > 1.5:
+        checklist.append("❌ Sentiment reversal risk: overly long base")
+    elif cot["extreme_zscore"] < -1.5:
+        checklist.append("❌ Sentiment reversal risk: overly short base")
+
+    risk_pct = 0.5
+    checklist.append(f"❌ Risk reduced to {risk_pct}% due to sentiment reversal")
+
 
     # Weighted Score
     score = 0.0
@@ -729,7 +742,7 @@ def scan_trade_opportunity(pair, base_ccy, quote_ccy):
 
     if score >= SCORE_THRESHOLD:
         print(f"✅ TRADE VALIDATED ({score:.1f} pts, {direction.upper()} {pair})")
-        send_email_alert(pair, checklist, direction, score)
+        send_email_alert(pair, checklist, direction, score, risk_pct)
         log_trade(pair, checklist, score)
     else:
         print(f"❌ Not enough score ({score:.1f} / {SCORE_THRESHOLD})")

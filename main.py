@@ -787,12 +787,17 @@ SCORE_THRESHOLD = 4        # minimum weighted points to validate a trade
 # ───────────────────────────────────────────────────────────────
 def auto_run_dashboard():
     print("🚀 __main__ reached — scheduled scan mode active", flush=True)
+    last_minute_scanned = None
 
     while True:
         now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=10)))  # AEST
+        current_time = now.strftime("%H:%M")
 
-        if 14 <= now.hour < 22:  # Only scan between 2PM and 10PM AEST
-            current_time = now.strftime("%H:%M")
+        if not (14 <= now.hour < 22):  # 2PM to 10PM AEST only
+            time.sleep(20)
+            continue
+
+        if now.minute != last_minute_scanned:
             print(f"\n🕕 Running scheduled scan at {current_time} AEST", flush=True)
             print(f"[SCAN START] {datetime.datetime.now(datetime.timezone.utc)} UTC", flush=True)
 
@@ -803,8 +808,10 @@ def auto_run_dashboard():
                     print(f"⚠️ Error during scan of {pair}: {e}", flush=True)
                 print("---------------------------------------", flush=True)
 
-        # Always wait 10 minutes before scanning again, even if outside killzone
-        time.sleep(600)
+            last_minute_scanned = now.minute
+
+        time.sleep(10)
+
 
 
 

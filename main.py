@@ -737,34 +737,41 @@ def scan_trade_opportunity(pair, base_ccy, quote_ccy):
         checklist.append(f"❌ Risk reduced to {risk_pct}% due to sentiment reversal")
 
     # ─── Clean Log ─────────────────────────
-    print("\n" + "="*50)
-    print(f"📊 SCAN RESULT for {pair}")
-    print("-" * 50)
-    print(f"🧭 Direction Bias: {direction.upper()}")
-    print(f"🎯 Weighted Score: {score:.1f} / {SCORE_THRESHOLD}")
-    print(f"📉 Risk Applied: {risk_pct:.1f}% of account")
-    print("-" * 50)
+        print("\n" + "📊 SCAN RESULT:".ljust(18), pair)
+    print("─" * 44)
+    print(f"🧭 Direction Bias : {direction.upper()}")
+    print(f"🎯 Weighted Score : {score:.1f} / {SCORE_THRESHOLD}")
+    print(f"📉 Risk Applied   : {risk_pct:.1f}% of account\n")
 
-    print("✅ Passed Checklist:")
-    for item in checklist:
-        if item.startswith("✅"):
-            print(f"   {item}")
+    print("Checklist:")
+
+    def show(item_key, condition, details=""):
+        symbol = "✔️" if condition else "✖️"
+        color = "\033[92m" if condition else "\033[91m"  # Green or red
+        reset = "\033[0m"
+        line = f"{color}{symbol} {item_key}{' — ' + details if details else ''}{reset}"
+        print(line)
+
+    show("CB tone divergence hawk→dove", "CB tone divergence hawk→dove" in checklist)
+    show("CB tone divergence dove→hawk", "CB tone divergence dove→hawk" in checklist)
+    show("Yield spread", any("Yield spread" in x for x in checklist), 
+         next((x.split("+")[1].strip() for x in checklist if "Yield spread" in x), ""))
+    show("COT extreme", any("COT extreme" in x for x in checklist))
+    show("Retail crowd on wrong side", "Retail crowd on wrong side" in checklist)
+    show("Inter-market correlation confirmed", "Inter-market correlation confirmed" in checklist)
+    show("Major S/R break or clean pattern", "Major S/R break or clean pattern" in checklist)
+    show("Catalyst aligns", "Catalyst aligns" in checklist)
+
     print()
-
-    print("❌ Failed Checklist:")
-    for item in checklist:
-        if item.startswith("❌"):
-            print(f"   {item}")
-    print()
-
     if score >= SCORE_THRESHOLD:
-        print(f"🚨 TRADE VALIDATED: {direction.upper()} {pair} ({score:.1f} pts)")
+        print(f"🚨 TRADE VALIDATED: {direction.upper()} {pair}")
         send_email_alert(pair, checklist, direction, score, risk_pct)
         log_trade(pair, checklist, score)
     else:
         print(f"⛔ Trade Rejected: Not enough score ({score:.1f} / {SCORE_THRESHOLD})")
 
-    print("="*50 + "\n")
+    print("═" * 44 + "\n")
+
 
 
 # ───────────────────────────────────────────────────────────────

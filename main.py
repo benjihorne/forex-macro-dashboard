@@ -752,15 +752,6 @@ WEIGHTS = {
 
 SCORE_THRESHOLD = 4        # minimum weighted points to validate a trade
 # ───────────────────────────────────────────────────────────────
-
-if __name__ == "__main__":
-    print("⚙️ Testing final integrated COT logic...\n")
-
-    for currency in ["EUR", "JPY", "GBP", "AUD", "CAD"]:
-        result = get_cot_positioning(currency)
-        print(f"{currency}: Net Spec = {result['net_spec_position']}, Z-Score = {result['extreme_zscore']}")
-
-
 def auto_run_dashboard():
     print("🚀 __main__ reached — scheduled scan mode active", flush=True)
     scanned_hours_today = set()
@@ -789,9 +780,5 @@ def auto_run_dashboard():
 
         time.sleep(60)
 
-
-
 if __name__ == "__main__":
     auto_run_dashboard()
-
-# ... (all your function and class code goes here)

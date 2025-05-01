@@ -247,7 +247,7 @@ DOVISH  = ("cut", "ease", "accommodative", "downside risk")
 
 def get_central_bank_tone(ccy):
     texts = []
-    today = datetime.datetime.utcnow().date()
+    today = datetime.datetime.now(datetime.timezone.utc).date()
     for url in RSS_FEEDS.get(ccy, []):
         for entry in feedparser.parse(url).entries[:5]:
             ts = datetime.datetime(*entry.published_parsed[:6]).date()
@@ -432,7 +432,7 @@ def get_upcoming_catalyst(pair):
             return {"event": None, "bias_alignment": False}
 
         data = res.json()
-        now = datetime.datetime.utcnow()
+        now = datetime.datetime.now(datetime.timezone.utc)
         upcoming = []
 
         for event in data:
@@ -484,7 +484,7 @@ def send_email_alert(pair, checklist, direction, score, risk_pct):
     <ul>{''.join(f'<li>{item[2:]}</li>' for item in failed)}</ul>
 
     <p style='font-size:13px;margin-top:10px'>🎯 Manually check LTF structure & SL/TP</p>
-    <p style='font-size:12px;color:#888'>UTC: {datetime.datetime.utcnow():%Y-%m-%d %H:%M:%S}</p>
+    <p style='font-size:12px;color:#888'>UTC: {datetime.datetime.now(datetime.timezone.utc):%Y-%m-%d %H:%M:%S}</p>
 </body></html>
 """
 
@@ -497,7 +497,7 @@ def send_email_alert(pair, checklist, direction, score, risk_pct):
 
 def log_trade(pair, checklist, score):
     df = pd.DataFrame([{
-        "timestamp": datetime.datetime.utcnow(),
+        "timestamp": datetime.datetime.now(datetime.timezone.utc),
         "pair": pair,
         "checklist": " | ".join(checklist),
         "score": score
@@ -511,7 +511,7 @@ def log_trade(pair, checklist, score):
 # ───────────────────────────────────────────────────────────────────
 
 def precision_filters(pair, base_ccy, quote_ccy, direction):
-    now_utc = datetime.datetime.utcnow()
+    now_utc = datetime.datetime.now(datetime.timezone.utc)
 
     # 1. Time of Day Filter
     if not (8 <= now_utc.hour <= 16):

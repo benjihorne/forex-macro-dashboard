@@ -88,11 +88,17 @@ def api_health_check():
 
 # ── COT CONTRACT MAPPINGS ─────────────────────────────────────
 import cot_reports as cot
+import numpy as np
 
 def get_cot_positioning(currency):
     try:
+        # Load legacy futures data instead of disaggregated
         df = cot.cot_all('legacy_fut', verbose=False)
 
+        # Check available contract names (optional for debugging)
+        # print(df['Market and Exchange Names'].dropna().unique())
+
+        # Correct contract mapping for legacy_fut dataset
         contract_map = {
             "EUR": "EURO FX - CHICAGO MERCANTILE EXCHANGE",
             "GBP": "BRITISH POUND STERLING - CHICAGO MERCANTILE EXCHANGE",
@@ -106,7 +112,7 @@ def get_cot_positioning(currency):
             print(f"❌ No contract mapping found for {currency}")
             return {"net_spec_position": 0, "extreme_zscore": 0.0, "sentiment_reversal": False}
 
-        cot_filtered = df[df['Market and Exchange Names'].str.contains(contract_name, case=False, na=False)]
+        cot_filtered = df[df['Market and Exchange Names'].str.contains(contract_name, case=False)]
 
         if cot_filtered.empty:
             print(f"⚠️ No COT data found for {currency} (contract: {contract_name})")
@@ -117,17 +123,17 @@ def get_cot_positioning(currency):
         net_spec = cot_filtered['Noncommercial Positions-Long (All)'] - cot_filtered['Noncommercial Positions-Short (All)']
         latest_net = net_spec.iloc[-1]
         zscore = ((latest_net - net_spec.mean()) / net_spec.std()).round(2)
-        reversal = abs(zscore) > 2
 
         return {
             "net_spec_position": int(latest_net),
             "extreme_zscore": float(zscore),
-            "sentiment_reversal": reversal
+            "sentiment_reversal": bool(abs(zscore) > 1.5)
         }
 
     except Exception as e:
         print(f"⚠️ COT fetch error for {currency.upper()}: {e}")
         return {"net_spec_position": 0, "extreme_zscore": 0.0, "sentiment_reversal": False}
+
 
 
 

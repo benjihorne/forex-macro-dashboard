@@ -463,19 +463,32 @@ def send_email_alert(pair, checklist, direction, score):
 
     msg = MIMEMultipart("alternative")
     msg["Subject"] = f"[{direction.upper()}] {pair} — {score:.1f}-pt bias"
-    msg["From"]    = EMAIL_SENDER
-    msg["To"]      = EMAIL_RECEIVER
+    msg["From"] = EMAIL_SENDER
+    msg["To"] = EMAIL_RECEIVER
+
+    # Format checklist items
+    passed = [item for item in checklist if item.startswith("✅")]
+    failed = [item for item in checklist if item.startswith("❌")]
 
     html = f"""
     <html><body style='font-family:Arial'>
         <h2>📈 {pair} bias triggered</h2>
-        <p><b>Direction:</b> {'LONG' if direction=='long' else 'SHORT'}</p>
+        <p><b>Direction:</b> {'LONG' if direction == 'long' else 'SHORT'}</p>
         <p><b>Weighted score:</b> {score:.1f} / {SCORE_THRESHOLD}</p>
-        <ul>{''.join(f'<li>{item}</li>' for item in checklist)}</ul>
+
+        <h3 style='color:green'>✅ Passed Checklist</h3>
+        <ul>{''.join(f'<li>{item[2:]}</li>' for item in passed)}</ul>
+
+        <h3 style='color:red'>❌ Failed Checklist</h3>
+        <ul>{''.join(f'<li>{item[2:]}</li>' for item in failed)}</ul>
+
+        <p style='font-size:13px;margin-top:10px'>🎯 Manually check LTF structure & SL/TP</p>
         <p style='font-size:12px;color:#888'>UTC: {datetime.datetime.utcnow():%Y-%m-%d %H:%M:%S}</p>
     </body></html>
     """
+
     msg.attach(MIMEText(html, "html"))
+
     with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
         server.starttls()
         server.login(EMAIL_SENDER, EMAIL_PASS)

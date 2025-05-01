@@ -5,6 +5,7 @@ beautifulsoup4>=4.12
 lxml>=5.2            # fast HTML parser for bs4
 feedparser>=6.0      # RSS grab for CB tone
 cot-reports
+pytz>=2023.3         # timezone handling
 
 # ---- data wrangling ----
 pandas>=2.2

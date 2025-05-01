@@ -711,6 +711,8 @@ def scan_trade_opportunity(pair, base_ccy, quote_ccy):
         line = f"{key}: {catalyst['event']}"
         checklist.append(line)
 
+    direction = "long" if base_strength >= quote_strength else "short"
+
     # Weighted Score
     score = 0.0
     for item in checklist:
@@ -719,14 +721,13 @@ def scan_trade_opportunity(pair, base_ccy, quote_ccy):
 
     # ✅ COT — ENABLED
     cot = get_cot_positioning(base_ccy)
-    risk_pct = 2.0 if score >= 5 else 1.0  # default risk % based on strength
+    risk_pct = 2.0 if score >= 5 else 1.0
 
     if abs(cot["extreme_zscore"]) > 1.5:
         key = "COT extreme"
         line = f"{key}: z={cot['extreme_zscore']:.1f}"
         checklist.append(line)
 
-        # Sentiment reversal logic
         if cot["extreme_zscore"] > 1.5:
             checklist.append("❌ Sentiment reversal risk: overly long base")
         elif cot["extreme_zscore"] < -1.5:
@@ -735,7 +736,7 @@ def scan_trade_opportunity(pair, base_ccy, quote_ccy):
         risk_pct = 0.5
         checklist.append(f"❌ Risk reduced to {risk_pct}% due to sentiment reversal")
 
-       # Print result (clean version)
+    # ─── Clean Log ─────────────────────────
     print("\n" + "="*50)
     print(f"📊 SCAN RESULT for {pair}")
     print("-" * 50)

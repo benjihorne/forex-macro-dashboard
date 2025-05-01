@@ -711,23 +711,23 @@ def scan_trade_opportunity(pair, base_ccy, quote_ccy):
         line = f"{key}: {catalyst['event']}"
         checklist.append(line)
 
-   # ✅ COT — ENABLED
-cot = get_cot_positioning(base_ccy)
-risk_pct = 2.0 if score >= 5 else 1.0  # default risk % based on strength
+       # ✅ COT — ENABLED
+    cot = get_cot_positioning(base_ccy)
+    risk_pct = 2.0 if score >= 5 else 1.0  # default risk % based on strength
 
-if abs(cot["extreme_zscore"]) > 1.5:
-    key = "COT extreme"
-    line = f"{key}: z={cot['extreme_zscore']:.1f}"
-    checklist.append(line)
+    if abs(cot["extreme_zscore"]) > 1.5:
+        key = "COT extreme"
+        line = f"{key}: z={cot['extreme_zscore']:.1f}"
+        checklist.append(line)
 
-    # Sentiment reversal logic
-    if cot["extreme_zscore"] > 1.5:
-        checklist.append("❌ Sentiment reversal risk: overly long base")
-    elif cot["extreme_zscore"] < -1.5:
-        checklist.append("❌ Sentiment reversal risk: overly short base")
+        # Sentiment reversal logic
+        if cot["extreme_zscore"] > 1.5:
+            checklist.append("❌ Sentiment reversal risk: overly long base")
+        elif cot["extreme_zscore"] < -1.5:
+            checklist.append("❌ Sentiment reversal risk: overly short base")
 
-    risk_pct = 0.5
-    checklist.append(f"❌ Risk reduced to {risk_pct}% due to sentiment reversal")
+        risk_pct = 0.5
+        checklist.append(f"❌ Risk reduced to {risk_pct}% due to sentiment reversal")
 
 
 

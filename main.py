@@ -771,27 +771,35 @@ WEIGHTS = {
 SCORE_THRESHOLD = 4        # minimum weighted points to validate a trade
 # ───────────────────────────────────────────────────────────────
 def auto_run_dashboard():
-    print("🚀 __main__ reached — 1-minute scan loop active", flush=True)
+    print("🚀 __main__ reached — 3-minute scan loop active", flush=True)
+
+    scanned_minutes_today = set()
 
     while True:
         now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=10)))  # AEST
         current_time = now.strftime("%H:%M")
 
-        if not (14 <= now.hour < 22):  # Only scan from 14:00 to 21:59 AEST
+        # Killzone only: 2pm to 10pm AEST
+        if not (14 <= now.hour < 22):
             time.sleep(60)
             continue
 
-        print(f"\n🕕 Running scheduled scan at {current_time} AEST", flush=True)
-        print(f"[SCAN START] {datetime.datetime.now(datetime.timezone.utc)} UTC", flush=True)
+        # Scan every 3 minutes (on 00, 03, 06, ..., 57)
+        if now.minute % 3 == 0 and current_time not in scanned_minutes_today:
+            print(f"\n🕕 Running scheduled scan at {current_time} AEST", flush=True)
+            print(f"[SCAN START] {datetime.datetime.now(datetime.timezone.utc)} UTC", flush=True)
 
-        for pair, base, quote in TRADE_PAIRS:
-            try:
-                scan_trade_opportunity(pair, base, quote)
-            except Exception as e:
-                print(f"⚠️ Error during scan of {pair}: {e}", flush=True)
-            print("---------------------------------------", flush=True)
+            for pair, base, quote in TRADE_PAIRS:
+                try:
+                    scan_trade_opportunity(pair, base, quote)
+                except Exception as e:
+                    print(f"⚠️ Error during scan of {pair}: {e}", flush=True)
+                print("---------------------------------------", flush=True)
 
-        time.sleep(60)
+            scanned_minutes_today.add(current_time)
+
+        time.sleep(30)
+
 
 
 

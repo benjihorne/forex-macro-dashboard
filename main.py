@@ -59,7 +59,18 @@ TRADE_PAIRS = [
     ("USD/CAD", "USD", "CAD"),
     ("AUD/USD", "AUD", "USD"),
     ("GBP/JPY", "GBP", "JPY"),
-    ("EUR/USD", "EUR", "USD"),  # Optional: Keep if you want one slower, bigger liquidity pair
+    ("EUR/USD", "EUR", "USD"),
+    ("EUR/JPY", "EUR", "JPY"),
+    ("EUR/GBP", "EUR", "GBP"),
+    ("NZD/USD", "NZD", "USD"),
+    ("USD/CHF", "USD", "CHF"),
+    ("AUD/JPY", "AUD", "JPY"),
+    ("NZD/JPY", "NZD", "JPY"),
+    ("CAD/JPY", "CAD", "JPY"),
+    ("EUR/CAD", "EUR", "CAD"),
+    ("GBP/AUD", "GBP", "AUD"),
+    ("GBP/CAD", "GBP", "CAD"),
+    ("AUD/NZD", "AUD", "NZD")
 ]
 
 
@@ -841,7 +852,8 @@ def auto_run_dashboard():
             time.sleep(20)
             continue
 
-        if now.minute != last_minute_scanned:
+        # Only scan every 5 minutes
+        if now.minute % 5 == 0 and now.minute != last_minute_scanned:
             print(f"\n🕕 Running scheduled scan at {current_time} AEST", flush=True)
             print(f"[SCAN START] {datetime.datetime.now(datetime.timezone.utc)} UTC", flush=True)
 
@@ -855,6 +867,7 @@ def auto_run_dashboard():
             last_minute_scanned = now.minute
 
         time.sleep(10)
+
 
 
 def test_telegram_alert():

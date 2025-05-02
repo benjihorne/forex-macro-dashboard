@@ -18,7 +18,6 @@
 
 print("🧠 Starting macro bot scan...", flush=True)
 
-
 from scanner import run_macro_sentiment_scan
 
 if __name__ == "__main__":

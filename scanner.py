@@ -8,7 +8,7 @@ from cb_tone import get_central_bank_tone
 from yield_spread import get_yield_spread
 from sentiment import get_retail_sentiment
 from intermarket import get_intermarket_agreement
-from filters import is_in_killzone, is_volatility_sufficient, passes_structural_breakout, passes_daily_trend
+from filters import in_kill_zone as is_in_killzone, is_volatility_sufficient, passes_structural_breakout, passes_daily_trend
 from alerts import send_email_alert, send_telegram_alert
 
 
@@ -77,14 +77,14 @@ def log_trade(pair, direction, score, reasons):
         writer.writerow([time.strftime("%Y-%m-%d %H:%M"), pair, direction, score, " | ".join(reasons)])
 
 
-def run_macro_sentiment_scan(run_once=False):
+def run_macro_sentiment_scan(run_once=False, force=False):
     while True:
         print("\n==============================")
         print("🧠 Running Macro Checklist Scan")
         print("==============================")
 
         for pair, base, quote in TRADE_PAIRS:
-            if is_in_killzone() and is_volatility_sufficient(pair):
+            if is_in_killzone(force_override=force) and is_volatility_sufficient(pair):
                 scan_trade_opportunity(pair, base, quote)
             else:
                 print(f"Skipping {pair} due to killzone/volatility")

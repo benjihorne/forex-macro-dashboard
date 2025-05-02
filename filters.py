@@ -7,10 +7,13 @@ import numpy as np
 from config import FMP_API_KEY
 
 
-def is_in_killzone() -> bool:
-    aest = datetime.timezone(datetime.timedelta(hours=10))  # AEST (UTC+10)
-    now = datetime.datetime.now(tz=aest)
-    return 14 <= now.hour <= 22  # 2PM to 10PM AEST
+from utils import get_current_aest_time
+
+def in_kill_zone(force_override=False):
+    if force_override:
+        return True
+    current_hour = get_current_aest_time().hour
+    return 14 <= current_hour <= 22
 
 
 def is_volatility_sufficient(pair: str) -> bool:
